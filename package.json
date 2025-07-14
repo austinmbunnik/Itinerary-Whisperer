@@ -1,0 +1,30 @@
+{
+  "name": "itinerary-whisperer",
+  "version": "1.0.0",
+  "description": "Voice-to-text meeting recorder web application for group travel planning conversations",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "voice-to-text",
+    "meeting-recorder",
+    "travel-planning",
+    "express",
+    "whisper",
+    "transcription"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

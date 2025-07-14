@@ -1,0 +1,86 @@
+/* Custom animations and styles to supplement Tailwind */
+
+/* Recording button animation when recording */
+.record-btn.recording {
+    @apply bg-gradient-to-r from-red-500 to-red-600;
+    animation: pulse-record 2s infinite;
+}
+
+@keyframes pulse-record {
+    0% { 
+        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); 
+    }
+    50% { 
+        box-shadow: 0 6px 25px rgba(239, 68, 68, 0.6); 
+    }
+    100% { 
+        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); 
+    }
+}
+
+/* Email status styling */
+.email-status.success {
+    @apply bg-green-100 text-green-800 border border-green-200;
+}
+
+.email-status.error {
+    @apply bg-red-100 text-red-800 border border-red-200;
+}
+
+/* Question item hover effect enhancement */
+.question-item:hover {
+    @apply shadow-md;
+}
+
+/* Transcript text styling */
+.transcript-text {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.transcript-text::-webkit-scrollbar {
+    width: 6px;
+}
+
+.transcript-text::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+}
+
+.transcript-text::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+}
+
+.transcript-text::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+}
+
+/* Toast notification styles */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.toast-success {
+    @apply bg-green-500;
+}
+
+.toast-error {
+    @apply bg-red-500;
+}
+
+.toast-info {
+    @apply bg-blue-500;
+}
+
+/* Utility classes */
+.hidden {
+    display: none !important;
+}

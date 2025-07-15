@@ -3,20 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Voice-to-text meeting recorder for group travel planning conversations">
-    <title>Create trips by chatting with your friends</title>
+    <meta name="description" content="The group call notetaker that plans trips for you. Generate instant, bookable trips tailored to your group.">
+    <title>Itinerary Whisperer - The group call notetaker that plans trips</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        cream: {
-                            50: '#fefcf8',
-                            100: '#f9f7f4',
-                            200: '#f3f0ea',
-                            300: '#ede8df',
-                        }
+                        cream: '#f5f2eb'
                     }
                 }
             }
@@ -24,73 +19,120 @@
     </script>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-cream-50 font-sans text-gray-800 min-h-screen">
-    <header class="bg-gray-50 border-b border-gray-200 py-6 px-4 mb-8">
-        <h1 class="text-2xl md:text-4xl font-bold text-gray-700 text-center">Create trips by chatting with your friends</h1>
-    </header>
-
-    <main class="max-w-4xl mx-auto px-4 md:px-8">
-        <section id="recording-section" class="mb-12 p-6 md:p-8 bg-white rounded-xl shadow-lg border-2 border-blue-50">
-            <h2 class="text-xl md:text-2xl font-semibold text-gray-600 mb-6 text-center">Record Your Conversation</h2>
-            <div class="flex flex-col md:flex-row items-center justify-center gap-4">
-                <button type="button" id="record-button" class="record-btn flex items-center gap-3 px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-full hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl min-w-[200px] md:min-w-[250px]">
-                    <span id="record-icon" class="text-2xl">🎙️</span>
-                    <span id="record-text">Start Recording</span>
-                </button>
-                <div id="recording-status" class="recording-status hidden flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full font-medium">
-                    <span class="status-indicator w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                    <span id="recording-time">00:00</span>
+<body class="min-h-screen bg-cream text-black" style="background-image: url('https://uploadthingy.s3.us-west-1.amazonaws.com/juBMQMJCbUfpPFeN2BnR3Q/image%281%29.png'); background-size: cover; background-position: center; background-attachment: fixed; background-blend-mode: soft-light;">
+    <div class="bg-cream/80 min-h-screen">
+        <header class="bg-transparent py-4">
+            <div class="container mx-auto px-4">
+                <div class="flex items-center">
+                    <svg class="h-6 w-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span class="ml-2 text-xl font-bold">Itinerary Whisperer</span>
                 </div>
             </div>
-        </section>
+        </header>
 
-        <section id="questions-section" class="mb-12 p-6 md:p-8 bg-white rounded-xl shadow-lg border-l-4 border-blue-500">
-            <h2 class="text-xl md:text-2xl font-semibold text-gray-600 mb-6">Discussion Questions</h2>
-            <div id="questions-list">
-                <p class="text-gray-600 mb-5">Use these prompts to guide your travel planning conversation:</p>
-                <ul class="space-y-3">
-                    <li class="question-item p-4 bg-gray-50 rounded-lg border-l-3 border-blue-500 hover:bg-blue-50 hover:translate-x-1 transition-all duration-200 cursor-pointer">
-                        Where would you like to go and what's drawing you to that destination?
-                    </li>
-                    <li class="question-item p-4 bg-gray-50 rounded-lg border-l-3 border-blue-500 hover:bg-blue-50 hover:translate-x-1 transition-all duration-200 cursor-pointer">
-                        What's your budget range per person for this trip?
-                    </li>
-                    <li class="question-item p-4 bg-gray-50 rounded-lg border-l-3 border-blue-500 hover:bg-blue-50 hover:translate-x-1 transition-all duration-200 cursor-pointer">
-                        What dates work for everyone's schedule?
-                    </li>
-                    <li class="question-item p-4 bg-gray-50 rounded-lg border-l-3 border-blue-500 hover:bg-blue-50 hover:translate-x-1 transition-all duration-200 cursor-pointer">
-                        What activities or experiences are you most excited about?
-                    </li>
-                </ul>
-            </div>
-        </section>
-
-        <section id="transcript-section" class="mb-12 p-6 md:p-8 bg-white rounded-xl shadow-lg border-2 border-dashed border-gray-300 min-h-[200px]">
-            <h2 class="text-xl md:text-2xl font-semibold text-gray-600 mb-6">Transcript</h2>
-            <div id="transcript-display" class="min-h-[150px]">
-                <div class="transcript-placeholder text-center py-8 text-gray-400">
-                    <p class="text-lg mb-2">Your conversation transcript will appear here...</p>
-                    <p class="text-sm italic">Start recording to begin transcription</p>
+        <main class="container mx-auto px-4 py-12">
+            <div class="max-w-4xl mx-auto">
+                <h1 class="text-4xl md:text-6xl font-bold text-center mb-8">
+                    The group call notetaker<br>
+                    that plans trips<br>
+                    <span class="border-b-4 border-black pb-1">for you.</span>
+                </h1>
+                <div class="text-center max-w-2xl mx-auto mb-12">
+                    <p class="text-xl mb-2">
+                        Generate <strong>instant, bookable</strong> trips, <strong>tailored</strong> to your group.
+                    </p>
+                    <p class="text-xl">
+                        Just gather your friends, hit record, and start chatting.
+                    </p>
                 </div>
-                <div id="transcript-text" class="transcript-text hidden p-4 bg-gray-50 rounded-lg border border-gray-200 font-mono text-sm leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto"></div>
-            </div>
-        </section>
 
-        <section id="email-section" class="mb-12 p-6 md:p-8 bg-white rounded-xl shadow-lg border-l-4 border-blue-400">
-            <h2 class="text-xl md:text-2xl font-semibold text-gray-600 mb-6">Email Transcript</h2>
-            <form id="email-form" class="max-w-md">
-                <div class="mb-6">
-                    <label for="email-input" class="block text-sm font-medium text-gray-700 mb-2">Email address:</label>
-                    <input type="email" id="email-input" name="email" class="email-input w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200" required 
-                           placeholder="Enter your email address">
+                <div class="mt-16">
+                    <section id="recording-section" class="flex flex-col items-center bg-white/80 p-8 rounded-lg backdrop-blur-sm">
+                        <h2 class="text-2xl font-bold mb-6">Try it out</h2>
+                        <div id="record-button" class="w-24 h-24 rounded-full flex items-center justify-center mb-6 bg-black hover:bg-gray-800 cursor-pointer transition-colors">
+                            <svg id="record-icon" class="h-12 w-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                            </svg>
+                        </div>
+                        <p class="text-lg" id="recording-text">
+                            Click to start recording your conversation
+                        </p>
+                    </section>
                 </div>
-                <button type="submit" id="email-submit" class="submit-btn w-full md:w-auto px-6 py-3 bg-gradient-to-r from-blue-400 to-blue-600 text-white font-medium rounded-lg hover:from-blue-500 hover:to-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-200 transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none min-w-[180px]">
-                    Send Transcript
-                </button>
-                <div id="email-status" class="email-status hidden mt-4 p-3 rounded-lg text-sm font-medium"></div>
-            </form>
-        </section>
-    </main>
+
+                <div class="grid md:grid-cols-2 gap-8 mt-16 bg-white/80 p-8 rounded-lg backdrop-blur-sm">
+                    <section id="questions-section">
+                        <div class="flex items-center mb-4">
+                            <svg class="h-6 w-6 text-black mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <h2 class="text-2xl font-semibold">Discussion Questions</h2>
+                        </div>
+                        <p class="text-gray-700 mb-4">
+                            Use these questions to guide your conversation:
+                        </p>
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">1</span>
+                                <span>What destinations are you interested in visiting?</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">2</span>
+                                <span>How many days do you plan to spend in each location?</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">3</span>
+                                <span>What's your budget for this trip?</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">4</span>
+                                <span>What activities or attractions are must-sees for your group?</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">5</span>
+                                <span>Do you prefer hotels, vacation rentals, or a mix?</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">6</span>
+                                <span>How will you get around? (Rental car, public transport, etc.)</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">7</span>
+                                <span>Any dietary restrictions or food preferences to consider?</span>
+                            </li>
+                        </ul>
+                    </section>
+
+                    <section id="transcript-section" class="hidden">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <svg class="h-6 w-6 text-black mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <h2 class="text-2xl font-semibold">Transcript</h2>
+                            </div>
+                            <button class="flex items-center bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded-md text-sm">
+                                <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                                </svg>
+                                Export
+                            </button>
+                        </div>
+                        <div id="transcript-text" class="bg-gray-50 border border-gray-200 rounded-md p-4 max-h-80 overflow-y-auto whitespace-pre-line">
+                        </div>
+                        <div class="mt-4">
+                            <button class="bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-md w-full transition-colors">
+                                Generate Itinerary
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>

@@ -1,86 +1,122 @@
-/* Custom animations and styles to supplement Tailwind */
+/* Custom styles to supplement Tailwind CSS */
+
+/* Base font family */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
 
 /* Recording button animation when recording */
-.record-btn.recording {
-    @apply bg-gradient-to-r from-red-500 to-red-600;
+#record-button.recording {
+    background-color: #ef4444;
     animation: pulse-record 2s infinite;
+}
+
+#record-button.recording svg {
+    display: none;
+}
+
+#record-button.recording::after {
+    content: '';
+    display: block;
+    width: 24px;
+    height: 24px;
+    background-color: white;
+    border-radius: 4px;
 }
 
 @keyframes pulse-record {
     0% { 
-        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); 
+        opacity: 1;
+        transform: scale(1);
     }
     50% { 
-        box-shadow: 0 6px 25px rgba(239, 68, 68, 0.6); 
+        opacity: 0.8;
+        transform: scale(1.05);
     }
     100% { 
-        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); 
+        opacity: 1;
+        transform: scale(1);
     }
 }
 
-/* Email status styling */
-.email-status.success {
-    @apply bg-green-100 text-green-800 border border-green-200;
-}
-
-.email-status.error {
-    @apply bg-red-100 text-red-800 border border-red-200;
-}
-
-/* Question item hover effect enhancement */
-.question-item:hover {
-    @apply shadow-md;
-}
-
-/* Transcript text styling */
-.transcript-text {
+/* Transcript section scrollbar styling */
+#transcript-text {
     scrollbar-width: thin;
-    scrollbar-color: #cbd5e0 #f7fafc;
+    scrollbar-color: #e5e7eb #f9fafb;
 }
 
-.transcript-text::-webkit-scrollbar {
+#transcript-text::-webkit-scrollbar {
     width: 6px;
 }
 
-.transcript-text::-webkit-scrollbar-track {
-    @apply bg-gray-100;
+#transcript-text::-webkit-scrollbar-track {
+    background: #f3f4f6;
 }
 
-.transcript-text::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded-full;
+#transcript-text::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 9999px;
 }
 
-.transcript-text::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400;
+#transcript-text::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
 }
 
-/* Toast notification styles */
-.toast {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 12px 24px;
-    border-radius: 8px;
-    color: white;
-    font-weight: 500;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+/* Ensure proper backdrop blur support */
+@supports (backdrop-filter: blur(8px)) {
+    .backdrop-blur-sm {
+        backdrop-filter: blur(4px);
+    }
 }
 
-.toast-success {
-    @apply bg-green-500;
+/* Fallback for browsers without backdrop-filter support */
+@supports not (backdrop-filter: blur(8px)) {
+    .bg-white\/80 {
+        background-color: rgba(255, 255, 255, 0.9);
+    }
 }
 
-.toast-error {
-    @apply bg-red-500;
+/* Ensure proper opacity for background overlays */
+.bg-cream\/80 {
+    background-color: rgba(245, 242, 235, 0.8);
 }
 
-.toast-info {
-    @apply bg-blue-500;
-}
-
-/* Utility classes */
+/* Custom utility classes */
 .hidden {
     display: none !important;
+}
+
+/* Recording text animation */
+#recording-text.recording {
+    color: #dc2626;
+    font-weight: 500;
+}
+
+/* Focus states for better accessibility */
+button:focus-visible {
+    outline: 2px solid #000;
+    outline-offset: 2px;
+}
+
+input:focus-visible {
+    outline: 2px solid #000;
+    outline-offset: 2px;
+}
+
+/* Smooth transitions for all interactive elements */
+button, input, .transition-colors {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+}
+
+/* Ensure SVG icons maintain proper sizing */
+svg {
+    flex-shrink: 0;
+}
+
+/* Question number styling */
+.flex.items-start span:first-child {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
 }

@@ -52,14 +52,50 @@
                 <div class="mt-16">
                     <section id="recording-section" class="flex flex-col items-center bg-white/80 p-8 rounded-lg backdrop-blur-sm">
                         <h2 class="text-2xl font-bold mb-6">Try it out</h2>
-                        <div id="record-button" class="w-24 h-24 rounded-full flex items-center justify-center mb-6 bg-black hover:bg-gray-800 cursor-pointer transition-colors">
+                        
+                        <!-- Error Messages -->
+                        <div id="error-container" class="hidden w-full mb-4">
+                            <div id="error-message" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+                                <span id="error-text"></span>
+                                <button id="error-close" class="absolute top-0 bottom-0 right-0 px-4 py-3">
+                                    <svg class="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                        <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Status Display -->
+                        <div id="status-display" class="text-sm text-gray-600 mb-2">Ready to record</div>
+                        
+                        <!-- Record Button -->
+                        <div id="record-button" class="w-24 h-24 rounded-full flex items-center justify-center mb-4 bg-black hover:bg-gray-800 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                             <svg id="record-icon" class="h-12 w-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
                             </svg>
                         </div>
-                        <p class="text-lg" id="recording-text">
-                            Click to start recording your conversation
-                        </p>
+
+                        <!-- Control Buttons -->
+                        <div id="control-buttons" class="flex space-x-4 mb-4 hidden">
+                            <button id="pause-button" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md transition-colors">Pause</button>
+                            <button id="stop-button" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md transition-colors">Stop</button>
+                        </div>
+
+                        <!-- Recording Info -->
+                        <div class="text-center">
+                            <p class="text-lg" id="recording-text">
+                                Click to start recording your conversation
+                            </p>
+                            <div class="mt-2 text-sm text-gray-600">
+                                <span id="duration-display">00:00</span>
+                                <div class="mt-2 w-48 mx-auto">
+                                    <div class="bg-gray-200 rounded-full h-2">
+                                        <div id="level-meter" class="bg-green-400 h-2 rounded-full transition-all duration-150" style="width: 0%"></div>
+                                    </div>
+                                    <span class="text-xs text-gray-500">Audio Level</span>
+                                </div>
+                            </div>
+                        </div>
                     </section>
                 </div>
 
@@ -133,6 +169,7 @@
             </div>
         </main>
     </div>
+    <script src="js/audioRecorder.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

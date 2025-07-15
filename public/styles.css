@@ -1,14 +1,77 @@
 /* Custom styles to supplement Tailwind CSS */
 
+/* Custom color definitions for direct use */
+:root {
+    --color-mint: #dcfff7;
+    --color-turquoise: #92e1d8;
+    --color-coral: #ffa69e;
+    --color-berry: #aa4365;
+    --color-plum: #861757;
+}
+
 /* Base font family */
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-/* Recording button animation when recording */
+/* Custom background classes */
+.bg-plum { background-color: var(--color-plum); }
+.bg-berry { background-color: var(--color-berry); }
+.bg-coral { background-color: var(--color-coral); }
+.bg-turquoise { background-color: var(--color-turquoise); }
+.bg-mint { background-color: var(--color-mint); }
+
+.hover\:bg-plum:hover { background-color: var(--color-plum); }
+.hover\:bg-berry:hover { background-color: var(--color-berry); }
+.hover\:bg-coral:hover { background-color: var(--color-coral); }
+.hover\:bg-turquoise:hover { background-color: var(--color-turquoise); }
+.hover\:bg-mint:hover { background-color: var(--color-mint); }
+
+.bg-turquoise\/80 { background-color: rgba(146, 225, 216, 0.8); }
+.hover\:bg-turquoise\/80:hover { background-color: rgba(146, 225, 216, 0.8); }
+
+/* Text color classes */
+.text-plum { color: var(--color-plum); }
+.text-berry { color: var(--color-berry); }
+.text-coral { color: var(--color-coral); }
+.text-turquoise { color: var(--color-turquoise); }
+.text-mint { color: var(--color-mint); }
+
+/* Border color classes */
+.border-berry { border-color: var(--color-berry); }
+.border-turquoise\/50 { border-color: rgba(146, 225, 216, 0.5); }
+
+/* Background opacity classes */
+.bg-mint\/90 { background-color: rgba(220, 255, 247, 0.9); }
+.bg-mint\/30 { background-color: rgba(220, 255, 247, 0.3); }
+
+/* Screen reader only class for accessibility */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Record button base styles */
+#record-button {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+/* Recording state - coral with pulsing animation and square icon */
 #record-button.recording {
-    background-color: #ef4444;
+    background-color: #ffa69e;
     animation: pulse-record 2s infinite;
+}
+
+#record-button.recording:hover {
+    background-color: #aa4365;
 }
 
 #record-button.recording svg {
@@ -22,6 +85,27 @@ body {
     height: 24px;
     background-color: white;
     border-radius: 4px;
+}
+
+/* Stopped state - turquoise background indicating ready to restart */
+#record-button.stopped {
+    background-color: #92e1d8;
+}
+
+#record-button.stopped:hover {
+    background-color: #92e1d8cc;
+}
+
+/* Disabled state - muted colors and no interaction */
+#record-button.disabled {
+    background-color: #6b7280;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+#record-button.disabled:hover {
+    background-color: #6b7280;
+    transform: none;
 }
 
 @keyframes pulse-record {
@@ -92,15 +176,121 @@ body {
     font-weight: 500;
 }
 
+/* Audio level meter enhancements */
+.level-meter {
+    transition: width 0.1s ease-out;
+}
+
+.level-high {
+    background: linear-gradient(90deg, #92e1d8 0%, #ffa69e 100%);
+}
+
+.level-medium {
+    background-color: #92e1d8;
+}
+
+.level-low {
+    background-color: #92e1d8;
+    opacity: 0.7;
+}
+
+/* Button text state changes */
+#button-text {
+    transition: color 0.3s ease;
+    text-align: center;
+}
+
+#button-text.recording {
+    color: #ffa69e;
+    font-weight: 600;
+}
+
+#button-text.stopped {
+    color: #92e1d8;
+    font-weight: 600;
+}
+
+#button-text.disabled {
+    color: #6b7280;
+    opacity: 0.6;
+}
+
+/*
+Example JavaScript usage for button state management:
+
+const recordButton = document.getElementById('record-button');
+const buttonText = document.getElementById('button-text');
+
+// To start recording
+recordButton.className = 'w-24 h-24 rounded-full flex items-center justify-center mb-4 cursor-pointer recording';
+recordButton.setAttribute('data-state', 'recording');
+recordButton.setAttribute('aria-label', 'Stop Recording');
+buttonText.textContent = 'Stop Recording';
+buttonText.className = 'text-lg font-medium mb-2 recording';
+
+// To stop recording
+recordButton.className = 'w-24 h-24 rounded-full flex items-center justify-center mb-4 cursor-pointer stopped';
+recordButton.setAttribute('data-state', 'stopped');
+recordButton.setAttribute('aria-label', 'Start New Recording');
+buttonText.textContent = 'Recording Complete';
+buttonText.className = 'text-lg font-medium mb-2 stopped';
+
+// To disable button
+recordButton.className = 'w-24 h-24 rounded-full flex items-center justify-center mb-4 disabled';
+recordButton.setAttribute('data-state', 'disabled');
+recordButton.setAttribute('aria-label', 'Recording Disabled');
+buttonText.textContent = 'Processing...';
+buttonText.className = 'text-lg font-medium mb-2 disabled';
+
+// To reset to idle
+recordButton.className = 'w-24 h-24 rounded-full flex items-center justify-center mb-4 bg-black hover:bg-gray-800 cursor-pointer';
+recordButton.setAttribute('data-state', 'idle');
+recordButton.setAttribute('aria-label', 'Start Recording');
+buttonText.textContent = 'Start Recording';
+buttonText.className = 'text-lg font-medium mb-2';
+*/
+
 /* Focus states for better accessibility */
 button:focus-visible {
-    outline: 2px solid #000;
+    outline: 2px solid #aa4365;
     outline-offset: 2px;
 }
 
 input:focus-visible {
-    outline: 2px solid #000;
+    outline: 2px solid #aa4365;
     outline-offset: 2px;
+}
+
+/* Focus ring utilities for Tailwind-style focus states */
+.focus\:ring-4 { box-shadow: 0 0 0 4px var(--tw-ring-color); }
+.focus\:ring-2 { box-shadow: 0 0 0 2px var(--tw-ring-color); }
+.focus\:ring-berry { --tw-ring-color: rgba(170, 67, 101, 0.5); }
+.focus\:ring-coral { --tw-ring-color: rgba(255, 166, 158, 0.5); }
+.focus\:ring-turquoise { --tw-ring-color: rgba(146, 225, 216, 0.5); }
+.focus\:ring-opacity-50 { --tw-ring-opacity: 0.5; }
+.focus\:outline-none:focus { outline: 2px solid transparent; outline-offset: 2px; }
+
+/* Keyboard navigation indicators */
+#record-button:focus {
+    transform: scale(1.05);
+}
+
+/* Skip to main content link for keyboard users */
+.skip-to-main {
+    position: absolute;
+    left: -9999px;
+    z-index: 999;
+    padding: 1em;
+    background-color: var(--color-plum);
+    color: white;
+    text-decoration: none;
+    border-radius: 0.25rem;
+}
+
+.skip-to-main:focus {
+    left: 50%;
+    transform: translateX(-50%);
+    top: 1rem;
 }
 
 /* Smooth transitions for all interactive elements */
@@ -119,4 +309,92 @@ svg {
 .flex.items-start span:first-child {
     min-width: 1.5rem;
     min-height: 1.5rem;
+}
+
+/* Show Itinerary Button Animation */
+#show-itinerary-button {
+    animation: fadeInScale 0.5s ease-out;
+}
+
+@keyframes fadeInScale {
+    0% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Transcript Section Animations */
+#transcript-section {
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+#transcript-section.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Enhanced section spacing */
+#questions-section {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+#transcript-section {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    margin-bottom: 2rem;
+}
+
+/* Recording section enhancement */
+#recording-section {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Add subtle gradient to recording section */
+#recording-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(0,0,0,0.02) 100%);
+    pointer-events: none;
+}
+
+/* Smooth scrolling for the entire page */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Enhanced button transitions */
+.transition-all {
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+}
+
+/* Hide/show transitions for recording elements */
+.recording-elements-hide {
+    animation: fadeOutScale 0.3s ease-out forwards;
+}
+
+.recording-elements-show {
+    animation: fadeInScale 0.3s ease-out forwards;
+}
+
+@keyframes fadeOutScale {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
 }

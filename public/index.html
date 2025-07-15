@@ -11,7 +11,11 @@
             theme: {
                 extend: {
                     colors: {
-                        cream: '#f5f2eb'
+                        'mint': '#dcfff7',
+                        'turquoise': '#92e1d8',
+                        'coral': '#ffa69e',
+                        'berry': '#aa4365',
+                        'plum': '#861757'
                     }
                 }
             }
@@ -19,16 +23,16 @@
     </script>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body class="min-h-screen bg-cream text-black" style="background-image: url('https://uploadthingy.s3.us-west-1.amazonaws.com/juBMQMJCbUfpPFeN2BnR3Q/image%281%29.png'); background-size: cover; background-position: center; background-attachment: fixed; background-blend-mode: soft-light;">
-    <div class="bg-cream/80 min-h-screen">
+<body class="min-h-screen bg-mint text-black" style="background-image: url('https://uploadthingy.s3.us-west-1.amazonaws.com/juBMQMJCbUfpPFeN2BnR3Q/image%281%29.png'); background-size: cover; background-position: center; background-attachment: fixed; background-blend-mode: soft-light;">
+    <div class="bg-mint/90 min-h-screen">
         <header class="bg-transparent py-4">
             <div class="container mx-auto px-4">
                 <div class="flex items-center">
-                    <svg class="h-6 w-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="h-6 w-6 text-plum" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
-                    <span class="ml-2 text-xl font-bold">Itinerary Whisperer</span>
+                    <span class="ml-2 text-xl font-bold text-plum">Itinerary Whisperer</span>
                 </div>
             </div>
         </header>
@@ -38,7 +42,7 @@
                 <h1 class="text-4xl md:text-6xl font-bold text-center mb-8">
                     The group call notetaker<br>
                     that plans trips<br>
-                    <span class="border-b-4 border-black pb-1">for you.</span>
+                    <span class="border-b-4 border-berry pb-1">for you.</span>
                 </h1>
                 <div class="text-center max-w-2xl mx-auto mb-12">
                     <p class="text-xl mb-2">
@@ -50,11 +54,14 @@
                 </div>
 
                 <div class="mt-16">
-                    <section id="recording-section" class="flex flex-col items-center bg-white/80 p-8 rounded-lg backdrop-blur-sm">
+                    <section id="recording-section" class="flex flex-col items-center bg-white/90 p-8 rounded-lg backdrop-blur-sm" role="region" aria-label="Recording controls">
                         <h2 class="text-2xl font-bold mb-6">Try it out</h2>
                         
+                        <!-- ARIA Live Region for Status Updates -->
+                        <div id="aria-live-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+                        
                         <!-- Error Messages -->
-                        <div id="error-container" class="hidden w-full mb-4">
+                        <div id="error-container" class="hidden w-full mb-4" role="alert">
                             <div id="error-message" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
                                 <span id="error-text"></span>
                                 <button id="error-close" class="absolute top-0 bottom-0 right-0 px-4 py-3">
@@ -69,16 +76,42 @@
                         <div id="status-display" class="text-sm text-gray-600 mb-2">Ready to record</div>
                         
                         <!-- Record Button -->
-                        <div id="record-button" class="w-24 h-24 rounded-full flex items-center justify-center mb-4 bg-black hover:bg-gray-800 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg id="record-icon" class="h-12 w-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div id="record-button" 
+                             class="w-24 h-24 rounded-full flex items-center justify-center mb-4 bg-plum hover:bg-berry cursor-pointer transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-berry focus:ring-opacity-50" 
+                             data-state="idle"
+                             role="button" 
+                             tabindex="0"
+                             aria-label="Start Recording"
+                             aria-pressed="false"
+                             aria-describedby="recording-instructions">
+                            <svg id="record-icon" class="h-12 w-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
                             </svg>
                         </div>
+                        
+                        <!-- Button Text -->
+                        <div id="button-text" class="text-lg font-medium mb-2">Start Recording</div>
+                        
+                        <!-- Show Itinerary Button (Hidden by default) -->
+                        <button id="show-itinerary-button" 
+                                class="hidden bg-coral hover:bg-berry text-white px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-berry focus:ring-opacity-50"
+                                aria-label="Show us our itinerary - View the transcript of your recorded conversation">
+                            <span class="flex items-center">
+                                <svg class="h-6 w-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                                </svg>
+                                Show us our itinerary
+                            </span>
+                        </button>
 
                         <!-- Control Buttons -->
-                        <div id="control-buttons" class="flex space-x-4 mb-4 hidden">
-                            <button id="pause-button" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md transition-colors">Pause</button>
-                            <button id="stop-button" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md transition-colors">Stop</button>
+                        <div id="control-buttons" class="flex space-x-4 mb-4 hidden" role="group" aria-label="Recording controls">
+                            <button id="pause-button" 
+                                    class="bg-turquoise hover:bg-turquoise/80 text-black px-4 py-2 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-turquoise focus:ring-opacity-50"
+                                    aria-label="Pause recording">Pause</button>
+                            <button id="stop-button" 
+                                    class="bg-coral hover:bg-berry text-white px-4 py-2 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-coral focus:ring-opacity-50"
+                                    aria-label="Stop recording">Stop</button>
                         </div>
 
                         <!-- Recording Info -->
@@ -86,63 +119,83 @@
                             <p class="text-lg" id="recording-text">
                                 Click to start recording your conversation
                             </p>
+                            <p id="recording-instructions" class="sr-only">
+                                Press Space or Enter to start recording. During recording, press Space or Enter again to stop, or press P to pause.
+                            </p>
                             <div class="mt-2 text-sm text-gray-600">
                                 <span id="duration-display">00:00</span>
                                 <div class="mt-2 w-48 mx-auto">
                                     <div class="bg-gray-200 rounded-full h-2">
-                                        <div id="level-meter" class="bg-green-400 h-2 rounded-full transition-all duration-150" style="width: 0%"></div>
+                                        <div id="level-meter" class="bg-turquoise h-2 rounded-full transition-all duration-150" style="width: 0%"></div>
                                     </div>
                                     <span class="text-xs text-gray-500">Audio Level</span>
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Keyboard Help (Hidden by default, shown with ? key) -->
+                        <div id="keyboard-help" class="hidden mt-4 text-sm text-gray-600 bg-gray-100 p-4 rounded-md">
+                            <h3 class="font-semibold mb-2">Keyboard Shortcuts:</h3>
+                            <ul class="space-y-1">
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded">Space</kbd> or <kbd class="px-2 py-1 bg-gray-200 rounded">Enter</kbd> - Start/Stop recording (when button is focused)</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded">R</kbd> - Start/Stop recording (global)</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded">P</kbd> - Pause/Resume recording</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded">Esc</kbd> - Stop recording</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded">?</kbd> - Toggle this help menu</li>
+                            </ul>
+                        </div>
                     </section>
                 </div>
 
-                <div class="grid md:grid-cols-2 gap-8 mt-16 bg-white/80 p-8 rounded-lg backdrop-blur-sm">
-                    <section id="questions-section">
-                        <div class="flex items-center mb-4">
-                            <svg class="h-6 w-6 text-black mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            <h2 class="text-2xl font-semibold">Discussion Questions</h2>
-                        </div>
-                        <p class="text-gray-700 mb-4">
-                            Use these questions to guide your conversation:
-                        </p>
-                        <ul class="space-y-3">
+                <!-- Discussion Questions Section -->
+                <section id="questions-section" class="mt-16 bg-white/90 p-8 rounded-lg backdrop-blur-sm">
+                    <div class="flex items-center mb-4">
+                        <svg class="h-6 w-6 text-black mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <h2 class="text-2xl font-semibold">Discussion Questions</h2>
+                    </div>
+                    <p class="text-gray-700 mb-6">
+                        Use these questions to guide your conversation:
+                    </p>
+                    <div class="grid md:grid-cols-2 gap-x-8 gap-y-4">
+                        <ul class="space-y-4">
                             <li class="flex items-start">
-                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">1</span>
+                                <span class="inline-block bg-berry text-white rounded-full h-6 w-6 flex items-center justify-center mr-3 mt-0.5 flex-shrink-0 text-sm">1</span>
                                 <span>What destinations are you interested in visiting?</span>
                             </li>
                             <li class="flex items-start">
-                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">2</span>
+                                <span class="inline-block bg-berry text-white rounded-full h-6 w-6 flex items-center justify-center mr-3 mt-0.5 flex-shrink-0 text-sm">2</span>
                                 <span>How many days do you plan to spend in each location?</span>
                             </li>
                             <li class="flex items-start">
-                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">3</span>
+                                <span class="inline-block bg-berry text-white rounded-full h-6 w-6 flex items-center justify-center mr-3 mt-0.5 flex-shrink-0 text-sm">3</span>
                                 <span>What's your budget for this trip?</span>
                             </li>
                             <li class="flex items-start">
-                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">4</span>
+                                <span class="inline-block bg-berry text-white rounded-full h-6 w-6 flex items-center justify-center mr-3 mt-0.5 flex-shrink-0 text-sm">4</span>
                                 <span>What activities or attractions are must-sees for your group?</span>
                             </li>
+                        </ul>
+                        <ul class="space-y-4">
                             <li class="flex items-start">
-                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">5</span>
+                                <span class="inline-block bg-berry text-white rounded-full h-6 w-6 flex items-center justify-center mr-3 mt-0.5 flex-shrink-0 text-sm">5</span>
                                 <span>Do you prefer hotels, vacation rentals, or a mix?</span>
                             </li>
                             <li class="flex items-start">
-                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">6</span>
+                                <span class="inline-block bg-berry text-white rounded-full h-6 w-6 flex items-center justify-center mr-3 mt-0.5 flex-shrink-0 text-sm">6</span>
                                 <span>How will you get around? (Rental car, public transport, etc.)</span>
                             </li>
                             <li class="flex items-start">
-                                <span class="inline-block bg-black text-white rounded-full h-6 w-6 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-sm">7</span>
+                                <span class="inline-block bg-berry text-white rounded-full h-6 w-6 flex items-center justify-center mr-3 mt-0.5 flex-shrink-0 text-sm">7</span>
                                 <span>Any dietary restrictions or food preferences to consider?</span>
                             </li>
                         </ul>
-                    </section>
+                    </div>
+                </section>
 
-                    <section id="transcript-section" class="hidden">
+                <!-- Transcript Section (Initially Hidden) -->
+                <section id="transcript-section" class="hidden mt-8 bg-white/90 p-8 rounded-lg backdrop-blur-sm transition-all duration-500 ease-in-out">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
                                 <svg class="h-6 w-6 text-black mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,26 +203,26 @@
                                 </svg>
                                 <h2 class="text-2xl font-semibold">Transcript</h2>
                             </div>
-                            <button class="flex items-center bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded-md text-sm">
+                            <button class="flex items-center bg-turquoise hover:bg-turquoise/80 text-black px-3 py-1 rounded-md text-sm transition-colors">
                                 <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
                                 </svg>
                                 Export
                             </button>
                         </div>
-                        <div id="transcript-text" class="bg-gray-50 border border-gray-200 rounded-md p-4 max-h-80 overflow-y-auto whitespace-pre-line">
+                        <div id="transcript-text" class="bg-mint/30 border border-turquoise/50 rounded-md p-4 max-h-80 overflow-y-auto whitespace-pre-line">
                         </div>
                         <div class="mt-4">
-                            <button class="bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-md w-full transition-colors">
+                            <button class="bg-plum hover:bg-berry text-white px-4 py-2 rounded-md w-full transition-colors">
                                 Generate Itinerary
                             </button>
                         </div>
                     </section>
-                </div>
             </div>
         </main>
     </div>
     <script src="js/audioRecorder.js"></script>
+    <script src="js/recordingTimer.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

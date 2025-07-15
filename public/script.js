@@ -1,6 +1,9 @@
 // Audio Recorder instance
 let audioRecorder = null;
 
+// Recording Timer instance
+let recordingTimer = null;
+
 // Application State
 let isRecording = false;
 let recordingComplete = false;
@@ -23,16 +26,56 @@ const errorClose = document.getElementById('error-close');
 const controlButtons = document.getElementById('control-buttons');
 const pauseButton = document.getElementById('pause-button');
 const stopButton = document.getElementById('stop-button');
+const buttonText = document.getElementById('button-text');
+const showItineraryButton = document.getElementById('show-itinerary-button');
+const ariaLiveStatus = document.getElementById('aria-live-status');
+const keyboardHelp = document.getElementById('keyboard-help');
 
 // Initialize application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
 });
 
+// Helper function to announce status changes to screen readers
+function announceToScreenReader(message) {
+    if (ariaLiveStatus) {
+        ariaLiveStatus.textContent = message;
+        // Clear after announcement to prepare for next message
+        setTimeout(() => {
+            ariaLiveStatus.textContent = '';
+        }, 1000);
+    }
+}
+
+// Helper function to get display text for recorder state
+function getStateDisplayText(state) {
+    if (!window.AudioRecorder) return state;
+    
+    const stateTexts = {
+        [AudioRecorder.States.IDLE]: 'Not initialized',
+        [AudioRecorder.States.INITIALIZING]: 'Initializing...',
+        [AudioRecorder.States.READY]: 'Ready to record',
+        [AudioRecorder.States.RECORDING]: 'Recording in progress',
+        [AudioRecorder.States.PAUSED]: 'Recording paused',
+        [AudioRecorder.States.STOPPING]: 'Stopping...',
+        [AudioRecorder.States.ERROR]: 'Error'
+    };
+    
+    return stateTexts[state] || state;
+}
+
 async function initializeApp() {
     console.log('Itinerary Whisperer - Voice Recording App Initialized');
     
     try {
+        // Initialize recording timer
+        recordingTimer = new RecordingTimer();
+        recordingTimer.setMaxTimeCallback(() => {
+            console.log('⏰ Max recording time reached');
+            stopRecording();
+            showError('Maximum recording time (1 hour) reached. Recording has been stopped.', 'warning');
+        });
+        
         // Initialize audio recorder
         await initializeAudioRecorder();
         
@@ -60,17 +103,7 @@ async function initializeAudioRecorder() {
             throw new Error(error);
         }
         
-        // Set up UI integration
-        audioRecorder.setupUIIntegration({
-            startButton: recordButton,
-            stopButton: stopButton,
-            pauseButton: pauseButton,
-            statusDisplay: statusDisplay,
-            durationDisplay: durationDisplay,
-            levelMeter: levelMeter
-        });
-        
-        // Set up event handlers
+        // Set up event handlers before initialization
         setupAudioRecorderEvents();
         
         // Initialize the recorder (request permissions)
@@ -81,6 +114,9 @@ async function initializeAudioRecorder() {
         
         console.log('✅ AudioRecorder initialized successfully');
         hideError();
+        
+        // Update initial UI state
+        updateRecordingUI(false);
         
     } catch (error) {
         console.error('❌ AudioRecorder initialization failed:', error);
@@ -108,6 +144,9 @@ function setupAudioRecorderEvents() {
         recordingComplete = false;
         currentRecordingBlob = null;
         
+        // Start the timer
+        recordingTimer.start(durationDisplay);
+        
         // Update UI
         updateRecordingUI(true);
         hideError();
@@ -117,6 +156,9 @@ function setupAudioRecorderEvents() {
     audioRecorder.onRecordingStop = function() {
         console.log('⏹️ Recording stopped');
         isRecording = false;
+        
+        // Stop the timer
+        recordingTimer.stop();
     };
     
     // Recording complete event
@@ -140,13 +182,21 @@ function setupAudioRecorderEvents() {
     // Recording pause event
     audioRecorder.onRecordingPause = function() {
         console.log('⏸️ Recording paused');
+        recordingTimer.pause();
         recordingText.textContent = 'Recording paused - Click Resume to continue';
+        pauseButton.textContent = 'Resume';
+        pauseButton.setAttribute('aria-label', 'Resume recording');
+        announceToScreenReader('Recording paused. Press P to resume.');
     };
     
     // Recording resume event
     audioRecorder.onRecordingResume = function() {
         console.log('▶️ Recording resumed');
+        recordingTimer.resume();
         recordingText.textContent = 'Recording... Click Stop to finish';
+        pauseButton.textContent = 'Pause';
+        pauseButton.setAttribute('aria-label', 'Pause recording');
+        announceToScreenReader('Recording resumed.');
     };
     
     // Error event
@@ -154,6 +204,11 @@ function setupAudioRecorderEvents() {
         console.error('❌ AudioRecorder error:', error);
         isRecording = false;
         recordingComplete = false;
+        
+        // Stop the timer on error
+        if (recordingTimer) {
+            recordingTimer.stop();
+        }
         
         // Update UI
         updateRecordingUI(false);
@@ -166,23 +221,81 @@ function setupAudioRecorderEvents() {
         } else {
             showError('Recording error: ' + error.message, 'recording');
         }
+        
+        // Announce error to screen readers
+        announceToScreenReader(`Recording error: ${error.message}`);
     };
     
     // Memory warning event
     audioRecorder.onMemoryWarning = function() {
         console.warn('⚠️ Memory usage is high');
         showError('Recording memory usage is high. Consider stopping and starting a new recording.', 'warning');
+        announceToScreenReader('Memory usage is high. Consider stopping and starting a new recording.');
     };
     
     // Data available event (for debugging)
     audioRecorder.onDataAvailable = function(dataChunk) {
         console.debug('📊 Audio data chunk received:', dataChunk.size, 'bytes');
     };
+    
+    // Audio level monitoring
+    audioRecorder.onAudioLevel = function(level) {
+        if (levelMeter) {
+            levelMeter.style.width = `${level}%`;
+            levelMeter.className = `bg-turquoise h-2 rounded-full transition-all duration-150 ${level > 80 ? 'level-high' : level > 40 ? 'level-medium' : 'level-low'}`;
+        }
+    };
+    
+    // Duration update handler
+    audioRecorder.onDurationUpdate = function(duration) {
+        // Timer handles duration display, but we can use this for other UI updates
+        if (duration > 3540) { // 59 minutes - warn about approaching limit
+            announceToScreenReader('Recording approaching maximum duration.');
+        }
+    };
+    
+    // State change handler
+    audioRecorder.onStateChange = function(newState, oldState) {
+        console.log(`🔄 AudioRecorder state changed: ${oldState} → ${newState}`);
+        
+        // Update button states based on recorder state
+        if (pauseButton) {
+            pauseButton.disabled = newState !== AudioRecorder.States.RECORDING && 
+                                  newState !== AudioRecorder.States.PAUSED;
+        }
+        
+        if (stopButton) {
+            stopButton.disabled = newState !== AudioRecorder.States.RECORDING && 
+                                 newState !== AudioRecorder.States.PAUSED;
+        }
+        
+        // Update status display
+        if (statusDisplay) {
+            statusDisplay.textContent = getStateDisplayText(newState);
+        }
+    };
 }
 
 function setupEventListeners() {
-    // Record button click handler
+    // Record button handlers (click and keyboard)
     recordButton.addEventListener('click', toggleRecording);
+    recordButton.addEventListener('keydown', function(e) {
+        if (e.code === 'Space' || e.code === 'Enter') {
+            e.preventDefault();
+            toggleRecording();
+        }
+    });
+    
+    // Show itinerary button handler
+    if (showItineraryButton) {
+        showItineraryButton.addEventListener('click', showItinerary);
+        showItineraryButton.addEventListener('keydown', function(e) {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                showItinerary();
+            }
+        });
+    }
     
     // Control button handlers
     if (pauseButton) {
@@ -207,6 +320,48 @@ function setupEventListeners() {
             console.log('🔄 Page hidden during recording - maintaining recording');
         }
     });
+    
+    // Global keyboard shortcuts (only when not focused on interactive elements)
+    document.addEventListener('keydown', function(e) {
+        // Check if user is typing in an input field or focused on a button
+        const isTyping = e.target.matches('input, textarea, select');
+        const isOnButton = e.target.matches('button, [role="button"]');
+        
+        // Prevent shortcuts when typing or when a button is focused
+        if (isTyping || isOnButton) {
+            return;
+        }
+        
+        // R key to start/stop recording (safer than spacebar for global shortcuts)
+        if (e.code === 'KeyR' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            toggleRecording();
+            announceToScreenReader(isRecording ? 'Recording stopped' : 'Recording started');
+        }
+        
+        // P key to pause/resume during recording
+        if (e.code === 'KeyP' && isRecording && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            togglePause();
+        }
+        
+        // Escape to stop recording
+        if (e.code === 'Escape' && isRecording) {
+            e.preventDefault();
+            stopRecording();
+            announceToScreenReader('Recording stopped');
+        }
+        
+        // ? key to toggle keyboard help
+        if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            if (keyboardHelp) {
+                keyboardHelp.classList.toggle('hidden');
+                announceToScreenReader(keyboardHelp.classList.contains('hidden') ? 
+                    'Keyboard help closed' : 'Keyboard help opened');
+            }
+        }
+    });
 }
 
 async function toggleRecording() {
@@ -216,8 +371,10 @@ async function toggleRecording() {
     }
     
     try {
-        if (isRecording) {
+        if (audioRecorder.state === AudioRecorder.States.RECORDING) {
             await stopRecording();
+        } else if (audioRecorder.state === AudioRecorder.States.PAUSED) {
+            await resumeRecording();
         } else {
             await startRecording();
         }
@@ -231,16 +388,24 @@ async function startRecording() {
     console.log('🎬 Starting recording...');
     
     try {
+        // Reset recording state for new recording
+        recordingComplete = false;
+        currentRecordingBlob = null;
+        
         // Start recording with monitoring enabled
         const result = await audioRecorder.startRecording({
-            enableMonitoring: true
+            enableMonitoring: true,
+            timeslice: 1000 // 1 second chunks for better responsiveness
         });
         
         console.log('✅ Recording started successfully:', result);
         
         // Hide transcript section when starting new recording
         transcriptSection.classList.add('hidden');
+        transcriptSection.classList.remove('show');
         transcriptText.textContent = '';
+        
+        return result;
         
     } catch (error) {
         console.error('❌ Failed to start recording:', error);
@@ -252,10 +417,18 @@ async function stopRecording() {
     console.log('🛑 Stopping recording...');
     
     try {
-        const result = await audioRecorder.stopRecording();
+        // Ensure timer is stopped immediately
+        if (recordingTimer) {
+            recordingTimer.stop();
+        }
+        
+        const result = await audioRecorder.stopRecording({
+            reason: 'user_action'
+        });
         console.log('✅ Recording stopped successfully:', result);
         
         return result;
+        
     } catch (error) {
         console.error('❌ Failed to stop recording:', error);
         throw error;
@@ -269,9 +442,11 @@ async function togglePause() {
         const currentState = audioRecorder.state;
         
         if (currentState === AudioRecorder.States.RECORDING) {
-            await audioRecorder.pauseRecording();
+            const result = await audioRecorder.pauseRecording();
+            console.log('⏸️ Recording paused:', result);
         } else if (currentState === AudioRecorder.States.PAUSED) {
-            await audioRecorder.resumeRecording();
+            const result = await audioRecorder.resumeRecording();
+            console.log('▶️ Recording resumed:', result);
         }
     } catch (error) {
         console.error('❌ Failed to toggle pause:', error);
@@ -279,39 +454,101 @@ async function togglePause() {
     }
 }
 
+async function resumeRecording() {
+    if (!audioRecorder) return;
+    
+    try {
+        const result = await audioRecorder.resumeRecording();
+        console.log('▶️ Recording resumed:', result);
+        return result;
+    } catch (error) {
+        console.error('❌ Failed to resume recording:', error);
+        throw error;
+    }
+}
+
 function updateRecordingUI(recording) {
     if (recording) {
         // Recording state
-        recordButton.classList.add('recording', 'bg-red-600', 'hover:bg-red-700');
-        recordButton.classList.remove('bg-black', 'hover:bg-gray-800');
+        recordButton.classList.remove('hidden');
+        buttonText.classList.remove('hidden');
+        showItineraryButton.classList.add('hidden');
+        
+        recordButton.className = 'w-24 h-24 rounded-full flex items-center justify-center mb-4 cursor-pointer recording focus:outline-none focus:ring-4 focus:ring-coral focus:ring-opacity-50';
+        recordButton.setAttribute('data-state', 'recording');
+        recordButton.setAttribute('aria-label', 'Stop Recording');
+        recordButton.setAttribute('aria-pressed', 'true');
+        
         recordingText.textContent = 'Recording... Click Stop to finish';
         
-        // Show stop icon
-        recordIcon.innerHTML = `
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                  d="M6 18L18 6M6 6l12 12"></path>
-        `;
+        if (buttonText) {
+            buttonText.textContent = 'Stop Recording';
+            buttonText.className = 'text-lg font-medium mb-2 recording';
+        }
         
         // Show control buttons
         controlButtons.classList.remove('hidden');
         
-    } else {
-        // Idle state
-        recordButton.classList.remove('recording', 'bg-red-600', 'hover:bg-red-700');
-        recordButton.classList.add('bg-black', 'hover:bg-gray-800');
-        recordingText.textContent = 'Click to start recording your conversation';
+        // Update status
+        statusDisplay.textContent = 'Recording in progress';
         
-        // Show microphone icon
-        recordIcon.innerHTML = `
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
-        `;
+        // Announce to screen readers
+        announceToScreenReader('Recording started. Press Space or Enter to stop, P to pause, or Escape to cancel.');
+        
+    } else {
+        // Check if recording was completed
+        if (recordingComplete && currentRecordingBlob) {
+            // Stopped state - Hide recording button and show itinerary button
+            recordButton.classList.add('hidden');
+            buttonText.classList.add('hidden');
+            
+            // Show the itinerary button with animation and focus it
+            showItineraryButton.classList.remove('hidden');
+            setTimeout(() => {
+                showItineraryButton.focus();
+            }, 100);
+            
+            // Update recording text for completed state
+            recordingText.textContent = 'Recording completed successfully!';
+            
+            statusDisplay.textContent = 'Recording complete - Total time: ' + recordingTimer.getFormattedTime();
+            
+            // Announce completion
+            announceToScreenReader(`Recording completed. Total time: ${recordingTimer.getFormattedTime()}. Press Enter to show your itinerary.`);
+        } else {
+            // Idle state
+            recordButton.classList.remove('hidden');
+            recordButton.className = 'w-24 h-24 rounded-full flex items-center justify-center mb-4 bg-plum hover:bg-berry cursor-pointer transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-berry focus:ring-opacity-50';
+            recordButton.setAttribute('data-state', 'idle');
+            recordButton.setAttribute('aria-label', 'Start Recording');
+            recordButton.setAttribute('aria-pressed', 'false');
+            
+            recordingText.textContent = 'Click to start recording your conversation';
+            
+            if (buttonText) {
+                buttonText.classList.remove('hidden');
+                buttonText.textContent = 'Start Recording';
+                buttonText.className = 'text-lg font-medium mb-2';
+            }
+            
+            // Ensure itinerary button is hidden
+            showItineraryButton.classList.add('hidden');
+            
+            statusDisplay.textContent = 'Ready to record';
+            
+            // Reset timer display
+            if (!recordingComplete) {
+                recordingTimer.reset();
+            }
+            
+            // Announce ready state
+            announceToScreenReader('Ready to record. Press Space or Enter to start recording.');
+        }
         
         // Hide control buttons
         controlButtons.classList.add('hidden');
         
-        // Reset duration and level meter
-        durationDisplay.textContent = '00:00';
+        // Reset level meter
         levelMeter.style.width = '0%';
     }
 }
@@ -330,8 +567,8 @@ User 2: Perfect. What about accommodations? Should we look for hotels or Airbnbs
 
 User 1: Let's do a mix. Hotel in Paris and maybe an Airbnb in Rome for a more local experience.`;
     
-    // Show transcript section with generated transcript
-    showTranscript(sampleTranscript);
+    // Store the transcript but don't show it yet
+    transcriptText.textContent = sampleTranscript;
     
     // TODO: Implement actual audio processing and transcription
     console.log('🔄 TODO: Send recording to transcription API');
@@ -340,6 +577,59 @@ User 1: Let's do a mix. Hotel in Paris and maybe an Airbnb in Rome for a more lo
 function showTranscript(transcript) {
     transcriptSection.classList.remove('hidden');
     transcriptText.textContent = transcript;
+}
+
+function showItinerary() {
+    console.log('📋 Showing itinerary...');
+    
+    // Hide the itinerary button with animation
+    showItineraryButton.style.animation = 'fadeOutScale 0.3s ease-out forwards';
+    
+    setTimeout(() => {
+        // Hide the itinerary button
+        showItineraryButton.classList.add('hidden');
+        
+        // Show the recording button and text again for new recording
+        recordButton.classList.remove('hidden');
+        buttonText.classList.remove('hidden');
+        
+        // Reset recording button to idle state
+        recordButton.className = 'w-24 h-24 rounded-full flex items-center justify-center mb-4 bg-plum hover:bg-berry cursor-pointer transition-all duration-300';
+        recordButton.setAttribute('data-state', 'idle');
+        recordButton.setAttribute('aria-label', 'Start New Recording');
+        
+        buttonText.textContent = 'Start New Recording';
+        buttonText.className = 'text-lg font-medium mb-2';
+        
+        recordingText.textContent = 'Ready to record another conversation';
+        
+        // Reset the recording state
+        recordingComplete = false;
+        currentRecordingBlob = null;
+        recordingTimer.reset();
+        
+        // Show transcript section with animation
+        transcriptSection.classList.remove('hidden');
+        transcriptSection.setAttribute('tabindex', '-1'); // Make it focusable
+        
+        // Trigger reflow to ensure animation plays
+        void transcriptSection.offsetWidth;
+        
+        // Add show class for animation
+        transcriptSection.classList.add('show');
+        
+        // Smooth scroll to transcript section and focus it
+        setTimeout(() => {
+            transcriptSection.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start',
+                inline: 'nearest'
+            });
+            transcriptSection.focus();
+            announceToScreenReader('Transcript displayed. Your conversation transcript is now visible below.');
+        }, 100);
+        
+    }, 300);
 }
 
 function showError(message, type = 'general') {
@@ -386,6 +676,19 @@ function cleanupRecording() {
             console.error('❌ Error during cleanup:', error);
         }
     }
+    
+    if (recordingTimer) {
+        try {
+            recordingTimer.cleanup();
+        } catch (error) {
+            console.error('❌ Error during timer cleanup:', error);
+        }
+    }
+    
+    // Reset UI state
+    isRecording = false;
+    recordingComplete = false;
+    currentRecordingBlob = null;
 }
 
 // Export button functionality
@@ -393,9 +696,12 @@ document.addEventListener('click', function(e) {
     if (e.target.closest('button') && e.target.closest('button').textContent.includes('Export')) {
         console.log('📤 Export button clicked');
         
-        if (currentRecordingBlob) {
+        if (audioRecorder && audioRecorder.currentBlob) {
             try {
-                audioRecorder.downloadRecording('itinerary-discussion.webm');
+                const timestamp = new Date().toISOString().slice(0, 10);
+                const filename = `itinerary-discussion-${timestamp}.webm`;
+                audioRecorder.downloadRecording(filename);
+                announceToScreenReader('Recording downloaded successfully.');
             } catch (error) {
                 console.error('❌ Export failed:', error);
                 showError('Failed to export recording: ' + error.message, 'general');
@@ -407,6 +713,7 @@ document.addEventListener('click', function(e) {
     
     if (e.target.closest('button') && e.target.closest('button').textContent.includes('Generate Itinerary')) {
         console.log('🗺️ Generate Itinerary button clicked');
+        announceToScreenReader('Itinerary generation feature coming soon.');
         alert('Itinerary generation coming soon!');
     }
 });

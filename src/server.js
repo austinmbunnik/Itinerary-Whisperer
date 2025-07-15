@@ -19,12 +19,23 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(express.static(path.join(__dirname, '../public')));
 
-app.use((err, req, res, next) => {
+// API Routes
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: config.env,
+    version: packageJson.version
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, _next) => {
   console.error('Error:', err.stack);
-  
+
   const statusCode = err.statusCode || err.status || 500;
   const message = err.message || 'Internal Server Error';
-  
+
   res.status(statusCode).json({
     error: {
       message,
@@ -34,6 +45,7 @@ app.use((err, req, res, next) => {
   });
 });
 
+// 404 handler (must be last)
 app.use('*', (req, res) => {
   res.status(404).json({
     error: {
@@ -41,15 +53,6 @@ app.use('*', (req, res) => {
       status: 404,
       timestamp: new Date().toISOString()
     }
-  });
-});
-
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: config.env,
-    version: packageJson.version
   });
 });
 

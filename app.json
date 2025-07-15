@@ -1,0 +1,129 @@
+{
+  "name": "Itinerary Whisperer",
+  "description": "Voice-to-text meeting recorder web application for group travel planning conversations",
+  "repository": "https://github.com/your-username/itinerary-whisperer",
+  "logo": "https://node-js-sample.herokuapp.com/node.png",
+  "keywords": [
+    "node",
+    "express",
+    "voice-to-text",
+    "transcription",
+    "travel-planning",
+    "whisper",
+    "openai"
+  ],
+  "image": "heroku/nodejs",
+  "stack": "heroku-22",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  },
+  "addons": [
+    {
+      "plan": "papertrail:choklad",
+      "options": {
+        "version": "0.1"
+      }
+    }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment mode (production recommended for Heroku)",
+      "value": "production",
+      "required": true
+    },
+    "PORT": {
+      "description": "Port the app will run on (automatically set by Heroku)",
+      "required": false
+    },
+    "SESSION_SECRET": {
+      "description": "Secret key for session encryption (minimum 32 characters)",
+      "generator": "secret",
+      "required": true
+    },
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API key for Whisper transcription service (get from https://platform.openai.com/api-keys)",
+      "required": true
+    },
+    "BREVO_API_KEY": {
+      "description": "Brevo (Sendinblue) API key for email service (get from https://app.brevo.com/settings/keys/api)",
+      "required": true
+    },
+    "FROM_EMAIL": {
+      "description": "Email address to send transcripts from",
+      "value": "noreply@itinerary-whisperer.com",
+      "required": true
+    },
+    "FROM_NAME": {
+      "description": "Display name for email sender",
+      "value": "Itinerary Whisperer",
+      "required": false
+    },
+    "FIREBASE_PROJECT_ID": {
+      "description": "Firebase project ID for Firestore database",
+      "required": true
+    },
+    "FIREBASE_PRIVATE_KEY": {
+      "description": "Firebase service account private key (include \\n characters)",
+      "required": true
+    },
+    "FIREBASE_CLIENT_EMAIL": {
+      "description": "Firebase service account email address",
+      "required": true
+    },
+    "CORS_ORIGIN": {
+      "description": "Comma-separated list of allowed CORS origins",
+      "value": "https://your-app-name.herokuapp.com",
+      "required": false
+    },
+    "BASE_URL": {
+      "description": "Base URL of the deployed application",
+      "value": "https://your-app-name.herokuapp.com",
+      "required": false
+    },
+    "RATE_LIMIT_MAX_REQUESTS": {
+      "description": "Maximum requests per rate limit window",
+      "value": "100",
+      "required": false
+    },
+    "MAX_FILE_SIZE": {
+      "description": "Maximum file upload size",
+      "value": "50MB",
+      "required": false
+    },
+    "LOG_LEVEL": {
+      "description": "Logging level for the application",
+      "value": "info",
+      "required": false
+    }
+  },
+  "environments": {
+    "test": {
+      "addons": [],
+      "env": {
+        "NODE_ENV": "test"
+      },
+      "formation": {
+        "web": {
+          "quantity": 1,
+          "size": "eco"
+        }
+      },
+      "scripts": {
+        "test": "npm test"
+      }
+    }
+  },
+  "scripts": {
+    "postdeploy": "echo 'Deployment completed. Check logs: heroku logs --tail'"
+  },
+  "success_url": "/health",
+  "website": "https://github.com/your-username/itinerary-whisperer"
+}

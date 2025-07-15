@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+build
+coverage
+
+# Environment files
+.env*
+
+# Logs
+*.log
+logs
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Package files
+package-lock.json
+yarn.lock
+
+# References and documentation that should not be auto-formatted
+References/
+*.md
+
+# Config files that should maintain their format
+.eslintrc.json
+.prettierrc.json
+tsconfig.json

@@ -101,9 +101,43 @@ Expected response:
   "status": "ok",
   "timestamp": "2024-01-01T12:00:00.000Z",
   "environment": "development",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "services": {
+    "openai": "connected",
+    "tempDirectory": "available",
+    "activeUploads": 0,
+    "costTracking": "enabled",
+    "emailService": "enabled"
+  },
+  "usage": {
+    "today": {
+      "requests": 0,
+      "cost": 0.00,
+      "currency": "USD"
+    },
+    "thisMonth": {
+      "requests": 0,
+      "cost": 0.00,
+      "currency": "USD"
+    },
+    "budgets": {
+      "daily": { "limit": 10.00, "remaining": 10.00 },
+      "monthly": { "limit": 200.00, "remaining": 200.00 }
+    }
+  }
 }
 ```
+
+**Service Status Indicators:**
+- `openai`: `connected` | `disconnected` - OpenAI Whisper API connection
+- `tempDirectory`: `available` | `unavailable` - Temporary file storage
+- `activeUploads`: Number of files currently being processed
+- `costTracking`: `enabled` | `disabled` - Cost tracking service
+- `emailService`: `enabled` | `disabled` - Email delivery service
+
+**Health Status:**
+- `ok`: All services operational
+- `degraded`: Some services unavailable (503 status)
 
 Or visit `http://localhost:3000/health` in your browser.
 
@@ -275,6 +309,261 @@ FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.c
 SESSION_SECRET=your_secure_session_secret_min_32_characters
 ```
 
+## 📖 API Documentation
+
+### Core Endpoints
+
+#### Health Check
+**GET** `/health`
+
+Check the application health and service status.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-01T12:00:00.000Z",
+  "environment": "production",
+  "version": "1.0.0",
+  "services": {
+    "openai": "connected",
+    "tempDirectory": "available",
+    "activeUploads": 2,
+    "costTracking": "enabled",
+    "emailService": "enabled"
+  },
+  "usage": {
+    "today": {
+      "requests": 45,
+      "cost": 8.10,
+      "currency": "USD"
+    },
+    "thisMonth": {
+      "requests": 1250,
+      "cost": 225.00,
+      "currency": "USD"
+    },
+    "budgets": {
+      "daily": { "limit": 10.00, "remaining": 1.90 },
+      "monthly": { "limit": 200.00, "remaining": -25.00 }
+    }
+  }
+}
+```
+
+#### Audio Transcription
+**POST** `/transcribe`
+
+Upload audio file for transcription using OpenAI Whisper.
+
+**Request:**
+- Content-Type: `multipart/form-data`
+- Field: `audio` (file upload)
+- Supported formats: MP3, WAV, M4A, WebM, OGG, MP4, FLAC, AAC
+- Max file size: 100MB
+
+**Response:**
+```json
+{
+  "success": true,
+  "jobId": "123e4567-e89b-12d3-a456-426614174000",
+  "message": "Audio file received and processing started"
+}
+```
+
+#### Job Status
+**GET** `/job/:jobId`
+
+Check transcription job status and retrieve results.
+
+**Response (Processing):**
+```json
+{
+  "success": true,
+  "job": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "status": "processing",
+    "createdAt": "2024-01-01T12:00:00.000Z",
+    "updatedAt": "2024-01-01T12:00:30.000Z",
+    "fileName": "meeting-recording.webm",
+    "fileSize": 2048000,
+    "retryCount": 0,
+    "message": "Processing audio with Whisper API"
+  }
+}
+```
+
+**Response (Completed):**
+```json
+{
+  "success": true,
+  "job": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "status": "completed",
+    "createdAt": "2024-01-01T12:00:00.000Z",
+    "updatedAt": "2024-01-01T12:02:15.000Z",
+    "transcriptText": "This is our travel planning meeting for Paris...",
+    "processedAt": "2024-01-01T12:02:15.000Z",
+    "cost": {
+      "total": 0.18,
+      "currency": "USD"
+    },
+    "emailStatus": {
+      "status": "sent",
+      "requestedAt": "2024-01-01T12:03:00.000Z",
+      "requestedBy": "user@example.com",
+      "sentAt": "2024-01-01T12:03:05.000Z",
+      "deliveryDetails": {
+        "recipient": "user@example.com",
+        "messageId": "msg-abc123def456",
+        "provider": "brevo",
+        "cost": 0.00022,
+        "duration": 1250
+      }
+    }
+  }
+}
+```
+
+#### Email Transcript
+**POST** `/email`
+
+Send completed transcript via email.
+
+**Request:**
+```json
+{
+  "email": "user@example.com",
+  "transcriptId": "123e4567-e89b-12d3-a456-426614174000"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Email request accepted and processing",
+  "details": {
+    "email": "user@example.com",
+    "transcriptId": "123e4567-e89b-12d3-a456-426614174000",
+    "requestedAt": "2024-01-01T12:00:00.000Z"
+  }
+}
+```
+
+#### Usage Statistics
+**GET** `/usage`
+
+Get current usage statistics and costs.
+
+**Response:**
+```json
+{
+  "success": true,
+  "usage": {
+    "today": {
+      "requests": 45,
+      "cost": 8.10,
+      "currency": "USD"
+    },
+    "thisMonth": {
+      "requests": 1250,
+      "cost": 225.00,
+      "currency": "USD"
+    },
+    "budgets": {
+      "daily": { "limit": 10.00, "remaining": 1.90 },
+      "monthly": { "limit": 200.00, "remaining": -25.00 }
+    }
+  },
+  "emailMetrics": {
+    "sent": 125,
+    "failed": 3,
+    "retries": 8,
+    "totalCost": 0.0275,
+    "avgCostPerEmail": 0.00022
+  },
+  "timestamp": "2024-01-01T12:00:00.000Z"
+}
+```
+
+### Job Lifecycle and States
+
+#### Transcription Job States
+1. **pending** - Job created, waiting to start
+2. **processing** - Audio being processed by Whisper API
+3. **completed** - Transcription successful, text available
+4. **failed** - Transcription failed, error details available
+
+#### Email States (within completed jobs)
+1. **processing** - Email request received, being processed
+2. **sent** - Email delivered successfully
+3. **failed** - Email delivery failed
+4. **error** - System error during email processing
+
+### Error Handling
+
+#### Standard Error Response
+```json
+{
+  "success": false,
+  "error": "Error message description",
+  "details": "ERROR_CODE",
+  "timestamp": "2024-01-01T12:00:00.000Z"
+}
+```
+
+#### Common Error Codes
+
+**Transcription Errors:**
+- `FILE_TOO_LARGE` - Audio file exceeds 100MB limit
+- `INVALID_FILE_FORMAT` - Unsupported audio format
+- `WHISPER_API_ERROR` - OpenAI Whisper API failure
+- `TRANSCRIPTION_FAILED` - Transcription processing failed
+- `SERVICE_UNAVAILABLE` - Too many concurrent uploads
+
+**Email Errors:**
+- `VALIDATION_ERROR` - Invalid email or UUID format
+- `TRANSCRIPT_NOT_FOUND` - Transcript doesn't exist
+- `TRANSCRIPT_NOT_READY` - Transcription not completed
+- `TRANSCRIPT_FAILED` - Transcription failed, can't send email
+- `TRANSCRIPT_EMPTY` - No content to email
+- `RATE_LIMIT_EXCEEDED` - Too many email requests (10/hour per IP)
+- `EMAIL_SEND_FAILED` - Email delivery failed
+- `EMAIL_SERVICE_UNAVAILABLE` - Email service not configured
+
+### Rate Limiting
+
+#### Email Endpoint Rate Limiting
+- **Limit**: 10 requests per hour per IP address
+- **Headers**: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`
+- **Response**: 429 Too Many Requests when exceeded
+
+```json
+{
+  "success": false,
+  "error": "Too many email requests from this IP address. Please try again later.",
+  "details": "RATE_LIMIT_EXCEEDED",
+  "retryAfter": "1 hour",
+  "limit": 10,
+  "windowMs": 3600000
+}
+```
+
+### Cost Tracking
+
+#### Transcription Costs
+- **OpenAI Whisper**: ~$0.006 per minute of audio
+- **Typical 30-minute meeting**: ~$0.18
+- **Daily budget**: $10.00 (default)
+- **Monthly budget**: $200.00 (default)
+
+#### Email Costs
+- **Brevo Free Tier**: 300 emails/day
+- **Paid Tier**: ~$0.00022 per email
+- **Daily budget**: 300 emails (default)
+- **Monthly budget**: 9,000 emails (default)
+
 ### Environment Variable Categories
 
 #### 🔒 **Core Security Variables**
@@ -291,10 +580,16 @@ SESSION_SECRET=your_secure_session_secret_min_32_characters
 
 #### 📧 **Email Service (Brevo)**
 - `BREVO_API_KEY` - Your Brevo API key (starts with `xkeysib-`)
-- `FROM_EMAIL` - Sender email address
-- `FROM_NAME` - Sender display name
+- `BREVO_FROM_EMAIL` - Sender email address (must be verified in Brevo)
+- `BREVO_FROM_NAME` - Sender display name for emails
+- `FROM_EMAIL` - Legacy sender email (for backward compatibility)
+- `FROM_NAME` - Legacy sender name (for backward compatibility)
 - `REPLY_TO_EMAIL` - Reply-to email address
 - `EMAIL_TEMPLATE_ID` - Email template ID (default: 1)
+- `EMAIL_DAILY_BUDGET` - Daily email limit (default: 300)
+- `EMAIL_MONTHLY_BUDGET` - Monthly email limit (default: 9000)
+- `EMAIL_BUDGET_WARNING_THRESHOLD` - Warning threshold (default: 0.8)
+- `EMAIL_BUDGET_CRITICAL_THRESHOLD` - Critical threshold (default: 0.95)
 
 #### 🔥 **Firebase Firestore**
 - `FIREBASE_PROJECT_ID` - Your Firebase project ID
@@ -339,10 +634,18 @@ Features are automatically enabled/disabled based on environment variable presen
 3. Copy the key (starts with `sk-`)
 
 #### Brevo API Key
-1. Sign up at [Brevo](https://www.brevo.com/)
+1. Sign up at [Brevo](https://www.brevo.com/) (formerly Sendinblue)
 2. Go to SMTP & API → API Keys
-3. Create a new API key
+3. Create a new API key with the following permissions:
+   - Send emails
+   - Manage email templates
+   - Access account information
 4. Copy the key (starts with `xkeysib-`)
+5. Set up sender domain verification:
+   - Go to Settings → Sender domains & dedicated IPs
+   - Add your domain (e.g., `itinerary-whisperer.com`)
+   - Follow DNS verification steps
+   - Use verified domain in `BREVO_FROM_EMAIL`
 
 #### Firebase Configuration
 1. Go to [Firebase Console](https://console.firebase.google.com/)
@@ -417,6 +720,10 @@ Itinerary Whisperer supports multiple Heroku deployment methods:
    heroku config:set OPENAI_API_KEY=sk-your-openai-key-here
    heroku config:set BREVO_API_KEY=xkeysib-your-brevo-key-here
    
+   # Brevo Email Configuration
+   heroku config:set BREVO_FROM_EMAIL=noreply@your-verified-domain.com
+   heroku config:set BREVO_FROM_NAME="Itinerary Whisperer"
+   
    # Firebase Configuration
    heroku config:set FIREBASE_PROJECT_ID=your-firebase-project-id
    heroku config:set FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
@@ -427,6 +734,12 @@ Itinerary Whisperer supports multiple Heroku deployment methods:
    # Email Configuration
    heroku config:set FROM_EMAIL=noreply@your-domain.com
    heroku config:set FROM_NAME="Itinerary Whisperer"
+   
+   # Email budgets and cost tracking
+   heroku config:set EMAIL_DAILY_BUDGET=300
+   heroku config:set EMAIL_MONTHLY_BUDGET=9000
+   heroku config:set EMAIL_BUDGET_WARNING_THRESHOLD=0.8
+   heroku config:set EMAIL_BUDGET_CRITICAL_THRESHOLD=0.95
    
    # App URLs
    heroku config:set BASE_URL=https://your-app-name.herokuapp.com
@@ -668,12 +981,77 @@ heroku run npm run health
 - Check application logs: `heroku logs --tail`
 - Test locally first: `npm start`
 
+### Service Requirements and Cost Considerations
+
+#### Brevo (Email Service) Requirements
+
+**Account Setup:**
+1. **Free Tier**: 300 emails/day, no credit card required
+2. **Sender Domain**: Must verify sender domain in Brevo dashboard
+3. **API Key**: Generate API key with email sending permissions
+
+**Cost Structure:**
+- **Free Tier**: 300 emails/day (~9,000/month)
+- **Paid Plans**: Start at $25/month for 20,000 emails
+- **Pay-as-you-go**: ~$0.00022 per email after free tier
+
+**Domain Verification Steps:**
+1. Add your domain in Brevo → Settings → Sender domains
+2. Add DNS records (SPF, DKIM, DMARC)
+3. Verify domain before deployment
+4. Use verified domain in `BREVO_FROM_EMAIL`
+
+#### OpenAI (Whisper API) Requirements
+
+**Cost Structure:**
+- **Whisper API**: $0.006 per minute of audio
+- **Typical 30-minute meeting**: ~$0.18
+- **Daily recommended budget**: $10.00
+- **Monthly recommended budget**: $200.00
+
+**Usage Monitoring:**
+- Built-in cost tracking and budget alerts
+- Daily/monthly usage limits configurable
+- Automatic warnings at 80% and 95% of budget
+
+#### Firebase (Database) Requirements
+
+**Cost Structure:**
+- **Free Tier**: 1GB storage, 20K writes/day
+- **Paid Plans**: $0.18/GB storage, $0.18/100K writes
+- **Typical usage**: Well within free tier limits
+
 ### Cost Optimization
 
 #### Free Tier Limitations
 - Heroku Eco dynos sleep after 30 minutes of inactivity
 - 550-1000 dyno hours per month (depending on account verification)
 - Apps sleep if no requests for 30 minutes
+
+#### Service Cost Optimization
+```bash
+# Monitor email usage
+curl https://your-app.herokuapp.com/usage
+
+# Set conservative email budgets
+heroku config:set EMAIL_DAILY_BUDGET=100
+heroku config:set EMAIL_MONTHLY_BUDGET=2000
+
+# Monitor transcription costs
+heroku config:set WHISPER_DAILY_BUDGET=5.00
+heroku config:set WHISPER_MONTHLY_BUDGET=100.00
+```
+
+#### Development vs Production Costs
+**Development:**
+- Use test email addresses
+- Small audio files for testing
+- Conservative budgets
+
+**Production:**
+- Monitor usage via `/usage` endpoint
+- Set up budget alerts
+- Scale email limits based on actual usage
 
 #### Optimization Tips
 ```bash

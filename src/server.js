@@ -2,17 +2,20 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const { existsSync } = require('fs');
 const crypto = require('crypto');
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4, validate: uuidValidate } = require('uuid');
+const { body, validationResult } = require('express-validator');
 const OpenAI = require('openai');
 const packageJson = require('../package.json');
 const config = require('../config');
 const { processWhisperTranscription, WhisperError } = require('./services/whisperService');
 const { initializeCostTracking, getUsageSummary } = require('./services/costTrackingService');
+const { initializeEmailService, getEmailService, EmailServiceError } = require('./services/emailService');
 
 const app = express();
 const PORT = config.port;
@@ -382,7 +385,8 @@ app.get('/health', (req, res) => {
       openai: openai ? 'connected' : 'disconnected',
       tempDirectory: existsSync(TEMP_DIR) ? 'available' : 'unavailable',
       activeUploads: activeUploads.size,
-      costTracking: 'enabled'
+      costTracking: 'enabled',
+      emailService: getEmailService() ? 'enabled' : 'disabled'
     },
     usage: {
       today: usageSummary.today,
@@ -680,6 +684,18 @@ app.get('/job/:jobId', (req, res) => {
         jobResponse.cost = job.metadata.cost;
       }
     }
+    // Include email status information if available
+    if (job.emailStatus) {
+      jobResponse.emailStatus = {
+        status: job.emailStatus,
+        requestedAt: job.emailRequestedAt,
+        requestedBy: job.emailRequestedBy,
+        sentAt: job.emailSentAt,
+        failedAt: job.emailFailedAt,
+        error: job.emailError,
+        deliveryDetails: job.emailDeliveryDetails
+      };
+    }
   } else if (job.status === JOB_STATUS.FAILED && job.error) {
     jobResponse.error = job.error;
     jobResponse.errorCode = job.errorCode || 'UNKNOWN_ERROR';
@@ -712,9 +728,14 @@ app.get('/usage', (req, res) => {
   try {
     const usageSummary = getUsageSummary();
     
+    // Include email service metrics if available
+    const emailService = getEmailService();
+    const emailMetrics = emailService ? emailService.getMetrics() : null;
+    
     res.status(200).json({
       success: true,
       usage: usageSummary,
+      emailMetrics: emailMetrics,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -723,6 +744,274 @@ app.get('/usage', (req, res) => {
       success: false,
       error: 'Failed to fetch usage data',
       details: 'USAGE_FETCH_ERROR'
+    });
+  }
+});
+
+// Email endpoint rate limiting middleware
+const emailRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // limit each IP to 10 requests per windowMs
+  message: {
+    success: false,
+    error: 'Too many email requests from this IP address. Please try again later.',
+    details: 'RATE_LIMIT_EXCEEDED',
+    retryAfter: '1 hour'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res) => {
+    const clientIP = req.ip || req.connection.remoteAddress;
+    console.warn(`Rate limit exceeded for /email endpoint from IP: ${clientIP}`);
+    console.warn(`Request details: ${JSON.stringify({
+      ip: clientIP,
+      userAgent: req.get('User-Agent'),
+      timestamp: new Date().toISOString(),
+      endpoint: '/email'
+    })}`);
+    
+    res.status(429).json({
+      success: false,
+      error: 'Too many email requests from this IP address. Please try again later.',
+      details: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: '1 hour',
+      limit: 10,
+      windowMs: 60 * 60 * 1000
+    });
+  },
+  skip: (req, res) => {
+    // Skip rate limiting for health checks or other conditions if needed
+    return false;
+  },
+  keyGenerator: (req) => {
+    // Use IP address as the key for rate limiting
+    return req.ip || req.connection.remoteAddress;
+  }
+});
+
+// Email endpoint validation middleware
+const validateEmailRequest = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address'),
+  body('transcriptId')
+    .notEmpty()
+    .withMessage('Transcript ID is required')
+    .custom((value) => {
+      if (!uuidValidate(value)) {
+        throw new Error('Transcript ID must be a valid UUID');
+      }
+      return true;
+    })
+];
+
+// POST /email endpoint
+app.post('/email', emailRateLimit, validateEmailRequest, async (req, res) => {
+  let job = null;
+  let emailSent = false;
+  
+  try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: 'VALIDATION_ERROR',
+        validationErrors: errors.array()
+      });
+    }
+
+    const { email, transcriptId } = req.body;
+
+    // Validate transcript exists in job store
+    job = getJob(transcriptId);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        error: 'Transcript not found. The transcript may have been deleted or never existed.',
+        details: 'TRANSCRIPT_NOT_FOUND'
+      });
+    }
+
+    // Check job status is completed
+    if (job.status !== JOB_STATUS.COMPLETED) {
+      const errorMessage = job.status === JOB_STATUS.FAILED 
+        ? 'Transcript generation failed. Cannot send email for failed transcriptions.'
+        : 'Transcript is not ready for email. Please wait for transcription to complete.';
+      
+      return res.status(400).json({
+        success: false,
+        error: errorMessage,
+        details: job.status === JOB_STATUS.FAILED ? 'TRANSCRIPT_FAILED' : 'TRANSCRIPT_NOT_READY',
+        currentStatus: job.status,
+        ...(job.status === JOB_STATUS.FAILED && job.error ? { errorReason: job.error } : {})
+      });
+    }
+
+    // Retrieve transcript text from completed job
+    if (!job.transcriptText) {
+      return res.status(400).json({
+        success: false,
+        error: 'Transcript has no content to email.',
+        details: 'TRANSCRIPT_EMPTY'
+      });
+    }
+
+    // Update job metadata to indicate email processing started
+    const emailProcessingUpdate = updateJobStatus(transcriptId, JOB_STATUS.COMPLETED, {
+      emailStatus: 'processing',
+      emailRequestedAt: new Date(),
+      emailRequestedBy: email,
+      emailRequestIP: req.ip || req.connection.remoteAddress
+    });
+
+    if (!emailProcessingUpdate) {
+      console.error(`Failed to update email processing status for job: ${transcriptId}`);
+    }
+
+    // Log email request details
+    const clientIP = req.ip || req.connection.remoteAddress;
+    console.log(`Processing email request for transcript ${transcriptId} from IP: ${clientIP}`);
+    console.log(`Email recipient: ${email}, Transcript length: ${job.transcriptText.length} characters`);
+
+    // Send immediate response that email is being processed
+    res.status(200).json({
+      success: true,
+      message: 'Email request accepted and processing',
+      details: {
+        email: email,
+        transcriptId: transcriptId,
+        requestedAt: new Date().toISOString()
+      }
+    });
+
+    // Process email sending asynchronously (similar to transcription processing)
+    setImmediate(async () => {
+      try {
+        // Get email service instance
+        const emailService = getEmailService();
+        if (!emailService) {
+          throw new EmailServiceError(
+            'Email service not available. Please check configuration.',
+            'EMAIL_SERVICE_UNAVAILABLE',
+            503
+          );
+        }
+        
+        // Send email with transcript
+        console.log(`Starting email delivery for transcript ${transcriptId} to ${email}`);
+        const emailResult = await emailService.sendTranscript(
+          email,
+          job.transcriptText,
+          transcriptId
+        );
+        
+        // Update job metadata with successful email delivery
+        const emailSuccessUpdate = updateJobStatus(transcriptId, JOB_STATUS.COMPLETED, {
+          emailStatus: 'sent',
+          emailSentAt: emailResult.sentAt,
+          emailDeliveryDetails: {
+            recipient: emailResult.recipient,
+            messageId: emailResult.messageId,
+            provider: emailResult.provider,
+            cost: emailResult.cost,
+            duration: emailResult.duration,
+            attempt: emailResult.attempt
+          }
+        });
+
+        if (!emailSuccessUpdate) {
+          console.error(`Failed to update email success status for job: ${transcriptId}`);
+        } else {
+          emailSent = true;
+          console.log(`Email delivery recorded for job: ${transcriptId}`);
+          
+          // Log metrics
+          const metrics = emailService.getMetrics();
+          console.log(`Email service metrics:`, metrics);
+        }
+
+        // Clean up job from memory after successful email delivery
+        // Wait a brief moment to allow any final status checks
+        setTimeout(() => {
+          if (emailSent) {
+            const cleaned = cleanupJob(transcriptId);
+            if (cleaned) {
+              console.log(`Job ${transcriptId} cleaned up after successful email delivery`);
+            } else {
+              console.warn(`Failed to cleanup job ${transcriptId} after email delivery`);
+            }
+          }
+        }, 5000); // 5 second delay before cleanup
+
+      } catch (emailError) {
+        console.error(`Failed to send email for transcript ${transcriptId}:`, emailError);
+        
+        // Extract error details
+        const errorCode = emailError.code || 'EMAIL_SEND_FAILED';
+        const errorMessage = emailError.message;
+        const statusCode = emailError.statusCode || 500;
+        const errorDetails = emailError.details || {};
+        
+        // Update job metadata with email failure
+        const emailFailureUpdate = updateJobStatus(transcriptId, JOB_STATUS.COMPLETED, {
+          emailStatus: 'failed',
+          emailFailedAt: new Date(),
+          emailError: errorMessage,
+          emailErrorCode: errorCode,
+          emailErrorStatusCode: statusCode,
+          emailErrorDetails: errorDetails
+        });
+
+        if (!emailFailureUpdate) {
+          console.error(`Failed to update email failure status for job: ${transcriptId}`);
+        }
+        
+        // Log detailed error for monitoring
+        console.error(`Email delivery failed for job ${transcriptId}:`, {
+          error: errorMessage,
+          errorCode: errorCode,
+          statusCode: statusCode,
+          recipient: email,
+          transcriptLength: job.transcriptText?.length || 0,
+          timestamp: new Date().toISOString(),
+          details: errorDetails
+        });
+        
+        // Log metrics even on failure
+        if (getEmailService()) {
+          const metrics = getEmailService().getMetrics();
+          console.log(`Email service metrics after failure:`, metrics);
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in /email endpoint:', error);
+    
+    // If we have a job reference, try to update its status
+    if (job && req.body.transcriptId) {
+      try {
+        const errorUpdate = updateJobStatus(req.body.transcriptId, JOB_STATUS.COMPLETED, {
+          emailStatus: 'error',
+          emailError: error.message,
+          emailErrorAt: new Date()
+        });
+        
+        if (!errorUpdate) {
+          console.error(`Failed to update email error status for job: ${req.body.transcriptId}`);
+        }
+      } catch (updateError) {
+        console.error('Failed to update job status after email error:', updateError);
+      }
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error while processing email request',
+      details: 'EMAIL_PROCESS_ERROR'
     });
   }
 });
@@ -770,6 +1059,12 @@ async function initializeServer() {
     const costTrackingInitialized = await initializeCostTracking();
     if (!costTrackingInitialized) {
       console.warn('Cost tracking initialization failed - continuing without cost tracking');
+    }
+    
+    // Initialize email service
+    const emailServiceInitialized = initializeEmailService();
+    if (!emailServiceInitialized) {
+      console.warn('Email service initialization failed - continuing without email functionality');
     }
     
     // Ensure temp directory exists

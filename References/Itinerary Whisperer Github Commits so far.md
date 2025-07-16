@@ -100,4 +100,44 @@ Ticket 2.4: Add comprehensive travel-themed upload system with enhanced …
 - Transform upload experience from technical process to engaging travel journey preview
 
 
+Ticket 3.1: Implement complete POST /transcribe endpoint with file uploa…
+…ds
+
+- Add Multer middleware for multipart form data handling
+- Implement comprehensive file validation (format, size, presence)
+- Add UUID-based job tracking with in-memory status store
+- Create robust temporary file storage and cleanup system
+- Add job status states: pending, processing, completed, failed
+- Implement automatic file cleanup with 30-minute retention
+- Add concurrent upload limiting (max 10)
+- Implement graceful server shutdown with cleanup
+- Add comprehensive error handling for all scenarios
+- Return consistent JSON responses with success/error format
+- Include proper HTTP status codes (200, 400, 500)
+
+
+Ticket 3.2: Implement comprehensive Whisper API integration with cost tr…
+…acking and budget monitoring
+
+- Add complete OpenAI Whisper API integration with exponential backoff retry logic
+- Implement real-time cost tracking ($0.006/minute) with daily/monthly budget alerts
+- Add support for 10+ audio formats with automatic FFmpeg conversion (FLAC, AAC, WMA, etc.)
+- Create comprehensive job tracking system with status updates throughout transcription process
+- Add robust error handling with proper error propagation and detailed API responses
+- Implement resource cleanup and memory management for production reliability
+- Add usage analytics endpoint and enhanced health checks with service monitoring
+- Include comprehensive testing suite with 31 passing workflow tests
+- Add production-ready features: rate limiting, graceful shutdown, structured logging
+
+
+Ticket Post-3.2 fixes: Complete frontend-backend integration with enhanc…
+…ed UI state management and email messaging
+
+- Frontend Integration: Connected recording workflow to backend /transcribe API with real job status polling
+- UI State Synchronization: Fixed contradictory UI states during transcription process (processing/ready conflicts)
+- Job Status Polling: Implemented comprehensive /job/:jobId polling with proper response parsing and error handling
+- Enhanced Error Handling: Added detailed logging and validation for API responses and job status progression
+- Email Messaging: Updated "Generate Itinerary" button to "Email me my itinerary" with corresponding popup message
+- Security Enhancement: Added Content Security Policy configuration to helmet middleware
+- Documentation: Created debugging guide and testing checklist for job status workflow
 

@@ -553,25 +553,294 @@ function updateRecordingUI(recording) {
     }
 }
 
-function processRecording(blob) {
+// Track current job for polling
+let currentJobId = null;
+let pollingInterval = null;
+
+async function processRecording(blob) {
     console.log('🔄 Processing recording...', blob);
+    console.log('📊 Recording details:', {
+        size: blob.size,
+        type: blob.type,
+        duration: recordingTimer.getFormattedTime()
+    });
     
-    // Simulate transcript generation (in real app, this would come from transcription API)
-    const sampleTranscript = `User 1: I think we should visit Paris first, then head to Rome.
+    try {
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('audio', blob, `recording-${Date.now()}.webm`);
+        
+        console.log('📤 Uploading audio to transcription API...');
+        console.log('🎯 UI State Transition: Recording Complete → Processing');
+        
+        // Hide all recording-related UI elements during processing
+        recordButton.classList.add('hidden');
+        buttonText.classList.add('hidden');
+        showItineraryButton.classList.add('hidden');
+        controlButtons.classList.add('hidden');
+        
+        // Update UI to show only processing state
+        recordingText.textContent = 'Processing your recording... This may take a few moments.';
+        statusDisplay.textContent = 'Uploading and processing';
+        announceToScreenReader('Recording uploaded. Processing transcription.');
+        
+        // Upload to transcribe endpoint
+        const response = await fetch('/transcribe', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        console.log('📥 Upload response:', result);
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to upload audio');
+        }
+        
+        if (!result.jobId) {
+            throw new Error('No job ID received from server');
+        }
+        
+        // Store job ID for polling
+        currentJobId = result.jobId;
+        console.log('✅ Upload successful. Job ID:', currentJobId);
+        
+        // Start polling for job status
+        startJobPolling(currentJobId);
+        
+    } catch (error) {
+        console.error('❌ Failed to process recording:', error);
+        console.log('🎯 UI State Transition: Processing → Error/Ready');
+        showError(`Failed to process recording: ${error.message}`, 'recording');
+        
+        // Reset UI state on error
+        recordingText.textContent = 'Recording failed. Please try again.';
+        recordingComplete = false;
+        currentRecordingBlob = null;
+        updateRecordingUI(false);
+    }
+}
 
-User 2: That sounds great! How many days should we spend in each city?
-
-User 1: Maybe 3 days in Paris and 4 in Rome?
-
-User 2: Perfect. What about accommodations? Should we look for hotels or Airbnbs?
-
-User 1: Let's do a mix. Hotel in Paris and maybe an Airbnb in Rome for a more local experience.`;
+// Poll job status until completion
+async function startJobPolling(jobId) {
+    console.log('🔄 Starting job status polling for:', jobId);
+    console.log('🔄 Polling configuration: interval=3s, max_polls=60, timeout=3min');
     
-    // Store the transcript but don't show it yet
-    transcriptText.textContent = sampleTranscript;
+    // Clear any existing polling
+    if (pollingInterval) {
+        console.log('🔄 Clearing existing polling interval');
+        clearInterval(pollingInterval);
+    }
     
-    // TODO: Implement actual audio processing and transcription
-    console.log('🔄 TODO: Send recording to transcription API');
+    let pollCount = 0;
+    const maxPolls = 60; // Max 3 minutes of polling (60 * 3 seconds)
+    
+    // Initial poll immediately
+    console.log('🔄 Starting initial job status check');
+    await checkJobStatus(jobId);
+    
+    // Then poll every 3 seconds
+    pollingInterval = setInterval(async () => {
+        pollCount++;
+        console.log(`🔄 Polling attempt ${pollCount}/${maxPolls} for job ${jobId}`);
+        
+        if (pollCount > maxPolls) {
+            console.warn('⚠️ Job polling timeout reached after', maxPolls, 'attempts');
+            console.log('🎯 UI State Transition: Processing → Timeout/Ready');
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            showError('Transcription is taking longer than expected. Please try again.', 'warning');
+            
+            // Reset UI state to ready
+            recordingComplete = false;
+            currentRecordingBlob = null;
+            currentJobId = null;
+            updateRecordingUI(false);
+            return;
+        }
+        
+        const completed = await checkJobStatus(jobId);
+        if (completed) {
+            console.log('🔄 Job completed, stopping polling after', pollCount, 'attempts');
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+    }, 3000);
+}
+
+// Check job status and update UI
+async function checkJobStatus(jobId) {
+    try {
+        console.log(`🔍 Checking job status: ${jobId}`);
+        
+        const response = await fetch(`/job/${jobId}`);
+        const responseData = await response.json();
+        
+        console.log('📊 Full API response:', JSON.stringify(responseData, null, 2));
+        console.log('📊 Response status:', response.status, response.ok);
+        
+        if (!response.ok) {
+            console.error('❌ API response error:', responseData);
+            throw new Error(responseData.error || 'Failed to get job status');
+        }
+        
+        // Parse job data from the response
+        if (!responseData.success) {
+            console.error('❌ API returned success=false:', responseData);
+            throw new Error(responseData.error || 'API request failed');
+        }
+        
+        if (!responseData.job) {
+            console.error('❌ No job data in response:', responseData);
+            throw new Error('No job data found in response');
+        }
+        
+        const job = responseData.job;
+        console.log('📊 Parsed job data:', JSON.stringify(job, null, 2));
+        console.log('📊 Job status value:', job.status);
+        
+        // Validate job status
+        if (!job.status) {
+            console.error('❌ Job status is missing or empty:', job);
+            throw new Error('Job status is missing from response');
+        }
+        
+        const validStatuses = ['pending', 'processing', 'completed', 'failed'];
+        if (!validStatuses.includes(job.status)) {
+            console.error('❌ Invalid job status:', job.status, 'Valid statuses:', validStatuses);
+            throw new Error(`Invalid job status: ${job.status}`);
+        }
+        
+        // Update UI based on job status
+        switch (job.status) {
+            case 'pending':
+                console.log('⏳ Job is pending');
+                recordingText.textContent = 'Waiting for transcription to start...';
+                statusDisplay.textContent = 'Queued for processing';
+                break;
+                
+            case 'processing':
+                console.log('⚙️ Job is processing');
+                recordingText.textContent = 'Transcribing your conversation... Please wait.';
+                statusDisplay.textContent = 'Transcription in progress';
+                if (job.retryCount > 0) {
+                    console.log(`🔄 Job retry count: ${job.retryCount}`);
+                    recordingText.textContent += ` (Retry ${job.retryCount})`;
+                }
+                break;
+                
+            case 'completed':
+                console.log('✅ Transcription completed successfully');
+                console.log('🎯 UI State Transition: Processing → Completed');
+                
+                // Validate transcript text
+                if (!job.transcriptText) {
+                    console.error('❌ No transcript text in completed job:', job);
+                    throw new Error('No transcript text in completed job');
+                }
+                
+                console.log('📄 Transcript length:', job.transcriptText.length, 'characters');
+                console.log('📄 Transcript preview:', job.transcriptText.substring(0, 100) + '...');
+                
+                // Store the transcript
+                transcriptText.textContent = job.transcriptText;
+                
+                // Show the transcript section immediately
+                transcriptSection.classList.remove('hidden');
+                transcriptSection.classList.add('show');
+                
+                // Update status messages
+                recordingText.textContent = 'Ready to record another conversation';
+                statusDisplay.textContent = 'Transcription complete';
+                
+                // Show recording button for new recording
+                recordButton.classList.remove('hidden');
+                buttonText.classList.remove('hidden');
+                buttonText.textContent = 'Start New Recording';
+                
+                // Reset recording button to idle state
+                recordButton.className = 'w-24 h-24 rounded-full flex items-center justify-center mb-4 bg-plum hover:bg-berry cursor-pointer transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-berry focus:ring-opacity-50';
+                recordButton.setAttribute('data-state', 'idle');
+                recordButton.setAttribute('aria-label', 'Start New Recording');
+                
+                // Scroll to transcript
+                setTimeout(() => {
+                    transcriptSection.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start',
+                        inline: 'nearest'
+                    });
+                    announceToScreenReader('Transcription completed. Your transcript is displayed below.');
+                }, 100);
+                
+                // Log cost information if available
+                if (job.cost) {
+                    console.log('💰 Transcription cost:', JSON.stringify(job.cost, null, 2));
+                }
+                
+                // Reset state for next recording
+                recordingComplete = false;
+                currentRecordingBlob = null;
+                currentJobId = null;
+                
+                return true; // Job completed
+                
+            case 'failed':
+                console.error('❌ Transcription failed');
+                console.log('🎯 UI State Transition: Processing → Failed/Ready');
+                console.error('❌ Job error data:', {
+                    error: job.error,
+                    errorCode: job.errorCode,
+                    failedAt: job.failedAt,
+                    errorDetails: job.errorDetails
+                });
+                
+                let errorMessage = 'Transcription failed';
+                if (job.error) {
+                    errorMessage = `Transcription failed: ${job.error}`;
+                }
+                if (job.errorCode === 'BUDGET_EXCEEDED') {
+                    errorMessage = 'Daily transcription budget exceeded. Please try again tomorrow.';
+                }
+                
+                showError(errorMessage, 'recording');
+                
+                // Reset UI state to ready
+                recordingComplete = false;
+                currentRecordingBlob = null;
+                currentJobId = null;
+                updateRecordingUI(false);
+                
+                return true; // Stop polling
+                
+            default:
+                console.warn('⚠️ Unknown job status:', job.status);
+                console.warn('⚠️ This should not happen due to validation above');
+        }
+        
+    } catch (error) {
+        console.error('❌ Failed to check job status:', error);
+        console.error('❌ Error details:', {
+            message: error.message,
+            stack: error.stack,
+            jobId: jobId
+        });
+        
+        // Check if this is a network error or parsing error
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            console.error('❌ Network error during job status check');
+        } else if (error.name === 'SyntaxError') {
+            console.error('❌ JSON parsing error in job status response');
+        } else {
+            console.error('❌ Other error during job status check:', error.name);
+        }
+        
+        // Don't show error for every poll failure, just log it
+        // The polling will retry automatically
+        return false;
+    }
+    
+    return false; // Continue polling
 }
 
 function showTranscript(transcript) {
@@ -581,55 +850,20 @@ function showTranscript(transcript) {
 
 function showItinerary() {
     console.log('📋 Showing itinerary...');
+    console.log('🎯 UI State Transition: Ready → Processing (via button click)');
     
-    // Hide the itinerary button with animation
-    showItineraryButton.style.animation = 'fadeOutScale 0.3s ease-out forwards';
+    // Check if we have a recording to process
+    if (!currentRecordingBlob) {
+        console.warn('⚠️ No recording available to process');
+        showError('No recording available. Please record a conversation first.', 'warning');
+        return;
+    }
     
-    setTimeout(() => {
-        // Hide the itinerary button
-        showItineraryButton.classList.add('hidden');
-        
-        // Show the recording button and text again for new recording
-        recordButton.classList.remove('hidden');
-        buttonText.classList.remove('hidden');
-        
-        // Reset recording button to idle state
-        recordButton.className = 'w-24 h-24 rounded-full flex items-center justify-center mb-4 bg-plum hover:bg-berry cursor-pointer transition-all duration-300';
-        recordButton.setAttribute('data-state', 'idle');
-        recordButton.setAttribute('aria-label', 'Start New Recording');
-        
-        buttonText.textContent = 'Start New Recording';
-        buttonText.className = 'text-lg font-medium mb-2';
-        
-        recordingText.textContent = 'Ready to record another conversation';
-        
-        // Reset the recording state
-        recordingComplete = false;
-        currentRecordingBlob = null;
-        recordingTimer.reset();
-        
-        // Show transcript section with animation
-        transcriptSection.classList.remove('hidden');
-        transcriptSection.setAttribute('tabindex', '-1'); // Make it focusable
-        
-        // Trigger reflow to ensure animation plays
-        void transcriptSection.offsetWidth;
-        
-        // Add show class for animation
-        transcriptSection.classList.add('show');
-        
-        // Smooth scroll to transcript section and focus it
-        setTimeout(() => {
-            transcriptSection.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'start',
-                inline: 'nearest'
-            });
-            transcriptSection.focus();
-            announceToScreenReader('Transcript displayed. Your conversation transcript is now visible below.');
-        }, 100);
-        
-    }, 300);
+    // Hide the itinerary button immediately to prevent double clicks
+    showItineraryButton.classList.add('hidden');
+    
+    // Process the recording
+    processRecording(currentRecordingBlob);
 }
 
 function showError(message, type = 'general') {
@@ -669,6 +903,13 @@ function hideError() {
 function cleanupRecording() {
     console.log('🧹 Cleaning up recording resources...');
     
+    // Clear any ongoing polling
+    if (pollingInterval) {
+        console.log('🛑 Stopping job polling');
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+    
     if (audioRecorder) {
         try {
             audioRecorder.cleanup();
@@ -689,6 +930,7 @@ function cleanupRecording() {
     isRecording = false;
     recordingComplete = false;
     currentRecordingBlob = null;
+    currentJobId = null;
 }
 
 // Export button functionality
@@ -711,10 +953,10 @@ document.addEventListener('click', function(e) {
         }
     }
     
-    if (e.target.closest('button') && e.target.closest('button').textContent.includes('Generate Itinerary')) {
-        console.log('🗺️ Generate Itinerary button clicked');
-        announceToScreenReader('Itinerary generation feature coming soon.');
-        alert('Itinerary generation coming soon!');
+    if (e.target.closest('button') && e.target.closest('button').textContent.includes('Email me my itinerary')) {
+        console.log('📧 Email itinerary button clicked');
+        announceToScreenReader('Email delivery feature coming soon.');
+        alert('Email delivery coming soon! We\'ll soon be able to send your personalized itinerary directly to your inbox.');
     }
 });
 

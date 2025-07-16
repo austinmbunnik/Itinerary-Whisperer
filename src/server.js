@@ -8,11 +8,77 @@ const fs = require('fs').promises;
 const { existsSync } = require('fs');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
+const OpenAI = require('openai');
 const packageJson = require('../package.json');
 const config = require('../config');
+const { processWhisperTranscription, WhisperError } = require('./services/whisperService');
+const { initializeCostTracking, getUsageSummary } = require('./services/costTrackingService');
 
 const app = express();
 const PORT = config.port;
+
+// OpenAI Configuration Validation
+function validateOpenAIConfig() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY environment variable is required but not set. Please add it to your .env file.');
+  }
+  
+  if (!process.env.OPENAI_API_KEY.startsWith('sk-')) {
+    throw new Error('OPENAI_API_KEY appears to be invalid. It should start with "sk-".');
+  }
+  
+  console.log('✓ OpenAI API key configuration validated');
+}
+
+// Initialize OpenAI Client
+let openai = null;
+function initializeOpenAI() {
+  try {
+    validateOpenAIConfig();
+    
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: parseInt(process.env.OPENAI_TIMEOUT) || 60000,
+      maxRetries: parseInt(process.env.OPENAI_MAX_RETRIES) || 3,
+    });
+    
+    console.log('✓ OpenAI client initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('✗ Failed to initialize OpenAI client:', error.message);
+    return false;
+  }
+}
+
+// OpenAI Transcription Helper with comprehensive error handling
+async function transcribeAudio(filePath, jobId = null, updateJobStatusCallback = null) {
+  try {
+    const result = await processWhisperTranscription(
+      openai,
+      filePath,
+      {
+        response_format: 'text',
+        model: process.env.OPENAI_MODEL || 'whisper-1',
+        temperature: 0
+      },
+      {
+        jobId,
+        updateJobStatus: updateJobStatusCallback,
+        onProgress: (progress) => {
+          console.log(`Transcription progress for job ${jobId}:`, progress.status);
+        }
+      }
+    );
+    
+    return result.transcript;
+  } catch (error) {
+    // Re-throw WhisperError as-is, convert others
+    if (error instanceof WhisperError) {
+      throw error;
+    }
+    throw new Error(`Transcription failed: ${error.message}`);
+  }
+}
 
 // Constants for file management
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
@@ -240,22 +306,44 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedMimes = [
       'audio/mpeg',
+      'audio/mp3',
       'audio/wav',
+      'audio/wave', 
+      'audio/x-wav',
       'audio/webm',
       'audio/ogg',
       'audio/mp4',
-      'audio/m4a'
+      'audio/m4a',
+      'audio/x-m4a',
+      'audio/flac',
+      'audio/x-flac',
+      'audio/aac',
+      'audio/x-aac',
+      'audio/wma',
+      'audio/x-ms-wma',
+      'audio/amr',
+      'audio/opus',
+      'video/webm', // WebM can contain audio only
+      'video/mp4'   // MP4 can contain audio only
     ];
     
-    const allowedExtensions = ['.wav', '.mp3', '.m4a', '.webm', '.ogg'];
+    const allowedExtensions = [
+      '.wav', '.mp3', '.m4a', '.webm', '.ogg', '.mp4',
+      '.flac', '.aac', '.wma', '.amr', '.opus'
+    ];
     const fileExtension = path.extname(file.originalname).toLowerCase();
     
     if (!allowedExtensions.includes(fileExtension)) {
       return cb(new Error(`Invalid file extension. Allowed formats: ${allowedExtensions.join(', ')}`));
     }
     
-    if (!allowedMimes.includes(file.mimetype)) {
-      return cb(new Error(`Invalid file type. Expected audio file, got: ${file.mimetype}`));
+    // More lenient MIME type checking since browsers can report different MIME types
+    const isAudioMime = file.mimetype.startsWith('audio/') || 
+                       ['video/webm', 'video/mp4'].includes(file.mimetype);
+    
+    if (!isAudioMime && !allowedMimes.includes(file.mimetype)) {
+      console.warn(`Unexpected MIME type: ${file.mimetype} for file with extension ${fileExtension}`);
+      // Allow based on extension if MIME type is uncertain
     }
     
     cb(null, true);
@@ -274,12 +362,33 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // API Routes
 app.get('/health', (req, res) => {
-  res.status(200).json({
+  const usageSummary = getUsageSummary();
+  
+  const healthStatus = {
     status: 'ok',
     timestamp: new Date().toISOString(),
     environment: config.env,
-    version: packageJson.version
-  });
+    version: packageJson.version,
+    services: {
+      openai: openai ? 'connected' : 'disconnected',
+      tempDirectory: existsSync(TEMP_DIR) ? 'available' : 'unavailable',
+      activeUploads: activeUploads.size,
+      costTracking: 'enabled'
+    },
+    usage: {
+      today: usageSummary.today,
+      thisMonth: usageSummary.thisMonth,
+      budgets: usageSummary.budgets
+    }
+  };
+  
+  // If critical services are down, return 503
+  if (!openai || !existsSync(TEMP_DIR)) {
+    healthStatus.status = 'degraded';
+    return res.status(503).json(healthStatus);
+  }
+  
+  res.status(200).json(healthStatus);
 });
 
 app.post('/transcribe', async (req, res) => {
@@ -421,9 +530,6 @@ app.post('/transcribe', async (req, res) => {
         });
       }
 
-      // TODO: Process the audio file here (transcription logic)
-      // For now, we'll simulate processing with a timeout
-      
       // Success response with job ID
       res.status(200).json({
         success: true,
@@ -431,27 +537,66 @@ app.post('/transcribe', async (req, res) => {
         message: 'Audio file received and processing started'
       });
 
-      // Simulate processing and mark as completed
-      setTimeout(async () => {
+      // Process the audio file asynchronously
+      setImmediate(async () => {
         try {
+          console.log(`Starting transcription process for job: ${jobId}`);
+          
+          // Perform actual transcription using OpenAI with job tracking
+          const transcriptText = await transcribeAudio(filePath, jobId, (id, status, data) => {
+            // This callback updates job status during transcription
+            const statusMap = {
+              'PROCESSING': JOB_STATUS.PROCESSING,
+              'COMPLETED': JOB_STATUS.COMPLETED,
+              'FAILED': JOB_STATUS.FAILED
+            };
+            
+            const mappedStatus = statusMap[status] || JOB_STATUS.PROCESSING;
+            updateJobStatus(id, mappedStatus, data);
+          });
+          
+          // Final update with transcript
           const completed = updateJobStatus(jobId, JOB_STATUS.COMPLETED, {
-            transcriptText: 'Sample transcript would go here...',
+            transcriptText: transcriptText,
             processedAt: new Date()
           });
           
           if (!completed) {
             console.error(`Failed to update job status to COMPLETED for job: ${jobId}`);
-            // Still clean up the file even if job update fails
+          } else {
+            console.log(`Transcription completed successfully for job: ${jobId}`);
           }
+          
         } catch (error) {
-          console.error(`Error updating job to completed for ${jobId}:`, error);
+          console.error(`Transcription failed for job ${jobId}:`, error.message);
+          
+          // Extract error details from WhisperError
+          const errorDetails = {
+            error: error.message,
+            errorCode: error.code || 'UNKNOWN_ERROR',
+            failedAt: new Date()
+          };
+          
+          if (error instanceof WhisperError) {
+            errorDetails.errorCode = error.code;
+            errorDetails.statusCode = error.statusCode;
+            if (error.details) {
+              errorDetails.details = error.details;
+            }
+          }
+          
+          const failed = updateJobStatus(jobId, JOB_STATUS.FAILED, errorDetails);
+          
+          if (!failed) {
+            console.error(`Failed to update job status to FAILED for job: ${jobId}`);
+          }
+        } finally {
+          // Always clean up the file after processing
+          if (filePath) {
+            await cleanupFile(filePath);
+          }
         }
-        
-        // Schedule file cleanup after processing is complete
-        if (filePath) {
-          await cleanupFile(filePath);
-        }
-      }, 5000); // Clean up after 5 seconds for demo purposes
+      });
 
     } catch (error) {
       console.error('Error in /transcribe endpoint:', error);
@@ -483,6 +628,94 @@ app.post('/transcribe', async (req, res) => {
       activeUploads.delete(uploadId);
     }
   });
+});
+
+// Job status endpoint
+app.get('/job/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  
+  if (!jobId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Job ID is required',
+      details: 'MISSING_JOB_ID'
+    });
+  }
+  
+  const job = getJob(jobId);
+  
+  if (!job) {
+    return res.status(404).json({
+      success: false,
+      error: 'Job not found. It may have been completed and cleaned up.',
+      details: 'JOB_NOT_FOUND'
+    });
+  }
+  
+  // Return job status without sensitive file paths
+  const jobResponse = {
+    id: job.id,
+    status: job.status,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt
+  };
+  
+  // Include additional data based on status
+  if (job.status === JOB_STATUS.COMPLETED && job.transcriptText) {
+    jobResponse.transcriptText = job.transcriptText;
+    jobResponse.processedAt = job.processedAt;
+    if (job.metadata) {
+      jobResponse.metadata = job.metadata;
+      // Include cost information if available
+      if (job.metadata.cost) {
+        jobResponse.cost = job.metadata.cost;
+      }
+    }
+  } else if (job.status === JOB_STATUS.FAILED && job.error) {
+    jobResponse.error = job.error;
+    jobResponse.errorCode = job.errorCode || 'UNKNOWN_ERROR';
+    jobResponse.failedAt = job.failedAt;
+    if (job.statusCode) {
+      jobResponse.statusCode = job.statusCode;
+    }
+    if (job.details) {
+      jobResponse.errorDetails = job.details;
+    }
+  } else if (job.status === JOB_STATUS.PROCESSING) {
+    jobResponse.fileName = job.fileName;
+    jobResponse.fileSize = job.fileSize;
+    if (job.retryCount !== undefined) {
+      jobResponse.retryCount = job.retryCount;
+    }
+    if (job.message) {
+      jobResponse.message = job.message;
+    }
+  }
+  
+  res.status(200).json({
+    success: true,
+    job: jobResponse
+  });
+});
+
+// Usage and cost tracking endpoint
+app.get('/usage', (req, res) => {
+  try {
+    const usageSummary = getUsageSummary();
+    
+    res.status(200).json({
+      success: true,
+      usage: usageSummary,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching usage data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch usage data',
+      details: 'USAGE_FETCH_ERROR'
+    });
+  }
 });
 
 // Error handling middleware
@@ -517,6 +750,19 @@ let cleanupInterval;
 
 async function initializeServer() {
   try {
+    // Initialize OpenAI client first
+    const openaiInitialized = initializeOpenAI();
+    if (!openaiInitialized) {
+      console.error('Server startup failed: OpenAI client initialization failed');
+      process.exit(1);
+    }
+    
+    // Initialize cost tracking
+    const costTrackingInitialized = await initializeCostTracking();
+    if (!costTrackingInitialized) {
+      console.warn('Cost tracking initialization failed - continuing without cost tracking');
+    }
+    
     // Ensure temp directory exists
     await ensureTempDir();
     

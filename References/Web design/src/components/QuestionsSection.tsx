@@ -1,4 +1,3 @@
-import React from 'react';
 import { HelpCircleIcon } from 'lucide-react';
 export const QuestionsSection = () => {
   const questions = ['What destinations are you interested in visiting?', 'How many days do you plan to spend in each location?', "What's your budget for this trip?", 'What activities or attractions are must-sees for your group?', 'Do you prefer hotels, vacation rentals, or a mix?', 'How will you get around? (Rental car, public transport, etc.)', 'Any dietary restrictions or food preferences to consider?'];

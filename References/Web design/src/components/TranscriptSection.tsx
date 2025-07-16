@@ -1,4 +1,3 @@
-import React from 'react';
 import { FileTextIcon, DownloadIcon } from 'lucide-react';
 interface TranscriptSectionProps {
   transcript: string;

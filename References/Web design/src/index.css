@@ -13,3 +13,81 @@
     background-color: #f5f2eb;
   }
 }
+
+/* Error Notification System Styles */
+@layer components {
+  .notification-container {
+    pointer-events: none;
+  }
+  
+  .notification-item {
+    pointer-events: auto;
+  }
+  
+  .notification-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+}
+
+@layer utilities {
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideOutRight {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+  }
+  
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+  }
+  
+  .animate-slide-out-right {
+    animation: slideOutRight 0.3s ease-in;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  .animate-fade-out {
+    animation: fadeOut 0.2s ease-in;
+  }
+}

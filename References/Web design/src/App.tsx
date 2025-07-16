@@ -1,12 +1,25 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Header } from './components/Header';
 import { RecordingSection } from './components/RecordingSection';
 import { QuestionsSection } from './components/QuestionsSection';
 import { TranscriptSection } from './components/TranscriptSection';
+import { ErrorNotification, useNotifications } from './components/ErrorNotification';
+import { FloatingRecordingStatus } from './components/RecordingStatusIndicator';
+import { RecordingState as ChunkedRecordingState } from './utils/chunkedAudioRecorder';
 export function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [recordingComplete, setRecordingComplete] = useState(false);
+  const [recordingState, setRecordingState] = useState<ChunkedRecordingState>({
+    isRecording: false,
+    isPaused: false,
+    duration: 0,
+    size: 0,
+    chunkCount: 0,
+    memoryStatus: null,
+    hasWarnings: false
+  });
+  const { notifications, removeNotification } = useNotifications();
   const toggleRecording = () => {
     if (isRecording) {
       // Simulate ending recording and generating transcript
@@ -27,8 +40,7 @@ export function App() {
     backgroundPosition: 'center',
     backgroundAttachment: 'fixed',
     backgroundColor: '#f5f2eb',
-    backgroundBlendMode: 'soft-light',
-    backgroundOpacity: '0.1'
+    backgroundBlendMode: 'soft-light'
   }}>
       <div className="bg-cream/80 min-h-screen">
         <Header />
@@ -51,7 +63,11 @@ export function App() {
               </p>
             </div>
             <div className="mt-16">
-              <RecordingSection isRecording={isRecording} toggleRecording={toggleRecording} />
+              <RecordingSection 
+                isRecording={isRecording} 
+                toggleRecording={toggleRecording}
+                onRecordingStateChange={setRecordingState}
+              />
             </div>
             <div className="grid md:grid-cols-2 gap-8 mt-16 bg-white/80 p-8 rounded-lg backdrop-blur-sm">
               <QuestionsSection />
@@ -59,6 +75,11 @@ export function App() {
             </div>
           </div>
         </main>
+        <ErrorNotification 
+          notifications={notifications} 
+          onClose={removeNotification} 
+        />
+        <FloatingRecordingStatus recordingState={recordingState} />
       </div>
     </div>;
 }

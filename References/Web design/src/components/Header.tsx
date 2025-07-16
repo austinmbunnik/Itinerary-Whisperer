@@ -1,4 +1,3 @@
-import React from 'react';
 import { MapPinIcon } from 'lucide-react';
 export const Header = () => {
   return <header className="bg-transparent py-4">

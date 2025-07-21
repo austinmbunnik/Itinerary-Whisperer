@@ -778,6 +778,17 @@ async function checkJobStatus(jobId) {
                     console.log('💰 Transcription cost:', JSON.stringify(job.cost, null, 2));
                 }
                 
+                // Store transcript ID for email functionality
+                currentTranscriptId = jobId;
+                
+                // Enable email button if we have a valid email
+                if (emailInput && emailButton) {
+                    const email = emailInput.value.trim();
+                    if (validateEmail(email)) {
+                        emailButton.disabled = false;
+                    }
+                }
+                
                 // Reset state for next recording
                 recordingComplete = false;
                 currentRecordingBlob = null;
@@ -933,6 +944,16 @@ function cleanupRecording() {
     currentJobId = null;
 }
 
+// Track the current transcript ID for email functionality
+let currentTranscriptId = null;
+
+// DOM Elements for email functionality
+const emailInput = document.getElementById('email-input');
+const emailButton = document.getElementById('email-transcript-button');
+const emailButtonText = document.getElementById('email-button-text');
+const emailLoadingSpinner = document.getElementById('email-loading-spinner');
+const emailStatus = document.getElementById('email-status');
+
 // Export button functionality
 document.addEventListener('click', function(e) {
     if (e.target.closest('button') && e.target.closest('button').textContent.includes('Export')) {
@@ -952,11 +973,38 @@ document.addEventListener('click', function(e) {
             showError('No recording available to export. Please record a conversation first.', 'general');
         }
     }
+});
+
+// Email functionality setup
+document.addEventListener('DOMContentLoaded', function() {
+    // Email input validation
+    if (emailInput) {
+        emailInput.addEventListener('input', function() {
+            const email = emailInput.value.trim();
+            const isValidEmail = validateEmail(email);
+            
+            if (emailButton) {
+                emailButton.disabled = !isValidEmail || !currentTranscriptId;
+            }
+            
+            // Update input styling based on validation
+            if (email.length > 0) {
+                if (isValidEmail) {
+                    emailInput.classList.remove('border-red-300', 'focus:ring-red-500', 'focus:border-red-500');
+                    emailInput.classList.add('border-green-300', 'focus:ring-green-500', 'focus:border-green-500');
+                } else {
+                    emailInput.classList.remove('border-green-300', 'focus:ring-green-500', 'focus:border-green-500');
+                    emailInput.classList.add('border-red-300', 'focus:ring-red-500', 'focus:border-red-500');
+                }
+            } else {
+                emailInput.classList.remove('border-red-300', 'border-green-300', 'focus:ring-red-500', 'focus:ring-green-500', 'focus:border-red-500', 'focus:border-green-500');
+            }
+        });
+    }
     
-    if (e.target.closest('button') && e.target.closest('button').textContent.includes('Email me my itinerary')) {
-        console.log('📧 Email itinerary button clicked');
-        announceToScreenReader('Email delivery feature coming soon.');
-        alert('Email delivery coming soon! We\'ll soon be able to send your personalized itinerary directly to your inbox.');
+    // Email button click handler
+    if (emailButton) {
+        emailButton.addEventListener('click', handleEmailTranscript);
     }
 });
 
@@ -971,13 +1019,161 @@ window.addEventListener('unhandledrejection', function(event) {
     showError('An unexpected error occurred. Please refresh the page.', 'general');
 });
 
+// Email validation function
+function validateEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+// Email transcript handler
+async function handleEmailTranscript() {
+    const email = emailInput.value.trim();
+    
+    // Validate inputs
+    if (!email) {
+        showEmailStatus('Please enter your email address', 'error');
+        emailInput.focus();
+        return;
+    }
+    
+    if (!validateEmail(email)) {
+        showEmailStatus('Please enter a valid email address', 'error');
+        emailInput.focus();
+        return;
+    }
+    
+    if (!currentTranscriptId) {
+        showEmailStatus('No transcript available to send', 'error');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        setEmailLoadingState(true);
+        showEmailStatus('Sending your transcript...', 'loading');
+        
+        console.log('📧 Sending transcript email to:', email, 'for job:', currentTranscriptId);
+        
+        // Make API request to send email
+        const response = await fetch('/email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: email,
+                transcriptId: currentTranscriptId
+            })
+        });
+        
+        const result = await response.json();
+        console.log('📧 Email API response:', result);
+        
+        if (!response.ok) {
+            // Handle different types of errors
+            if (response.status === 429) {
+                throw new Error('Too many email requests. Please try again later.');
+            } else if (response.status === 400) {
+                throw new Error(result.error || 'Invalid request. Please check your email address and try again.');
+            } else {
+                throw new Error(result.error || 'Failed to send email. Please try again.');
+            }
+        }
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to send email');
+        }
+        
+        // Show success message
+        showEmailStatus('Email sent successfully! Check your inbox.', 'success');
+        announceToScreenReader('Transcript email sent successfully');
+        
+        // Optional: Clear the email input after successful send
+        // emailInput.value = '';
+        
+    } catch (error) {
+        console.error('❌ Failed to send email:', error);
+        
+        // Handle specific error types
+        let errorMessage = error.message;
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('rate limit') || error.message.includes('Too many')) {
+            errorMessage = 'Too many email requests. Please try again in an hour.';
+        }
+        
+        showEmailStatus(errorMessage, 'error');
+        announceToScreenReader('Failed to send email: ' + errorMessage);
+        
+    } finally {
+        // Hide loading state
+        setEmailLoadingState(false);
+    }
+}
+
+// Email loading state management
+function setEmailLoadingState(loading) {
+    if (!emailButton || !emailButtonText || !emailLoadingSpinner) return;
+    
+    if (loading) {
+        emailButton.disabled = true;
+        emailButtonText.textContent = 'Sending...';
+        emailLoadingSpinner.classList.remove('hidden');
+    } else {
+        const email = emailInput?.value.trim();
+        emailButton.disabled = !validateEmail(email) || !currentTranscriptId;
+        emailButtonText.textContent = 'Email me my transcript';
+        emailLoadingSpinner.classList.add('hidden');
+    }
+}
+
+// Email status display
+function showEmailStatus(message, type = 'info') {
+    if (!emailStatus) return;
+    
+    emailStatus.textContent = message;
+    emailStatus.classList.remove('hidden', 'text-green-600', 'text-red-600', 'text-blue-600', 'text-gray-600');
+    
+    switch (type) {
+        case 'success':
+            emailStatus.classList.add('text-green-600');
+            break;
+        case 'error':
+            emailStatus.classList.add('text-red-600');
+            break;
+        case 'loading':
+            emailStatus.classList.add('text-blue-600');
+            break;
+        default:
+            emailStatus.classList.add('text-gray-600');
+    }
+    
+    // Auto-hide success messages after 5 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            if (emailStatus && emailStatus.textContent === message) {
+                emailStatus.classList.add('hidden');
+            }
+        }, 5000);
+    }
+}
+
 // Debug helpers (only in development)
 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     window.audioRecorder = audioRecorder;
     window.debugRecording = {
         getState: () => audioRecorder?.getState(),
         getCompatibility: () => audioRecorder?.getCompatibilityReport(),
-        getCurrentBlob: () => currentRecordingBlob
+        getCurrentBlob: () => currentRecordingBlob,
+        getCurrentTranscriptId: () => currentTranscriptId,
+        sendTestEmail: (email) => {
+            if (currentTranscriptId) {
+                emailInput.value = email;
+                handleEmailTranscript();
+            } else {
+                console.log('No transcript available for testing');
+            }
+        }
     };
     console.log('🔧 Debug helpers available: window.debugRecording');
 }

@@ -782,11 +782,8 @@ const emailRateLimit = rateLimit({
   skip: (req, res) => {
     // Skip rate limiting for health checks or other conditions if needed
     return false;
-  },
-  keyGenerator: (req) => {
-    // Use IP address as the key for rate limiting
-    return req.ip || req.connection.remoteAddress;
   }
+ 
 });
 
 // Email endpoint validation middleware

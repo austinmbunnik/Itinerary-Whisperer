@@ -32,28 +32,28 @@ class BrevoEmailService {
    * @throws {Error} If BREVO_API_KEY is not configured
    */
   constructor() {
-    this.apiKey = process.env.BREVO_API_KEY;
-    this.fromEmail = process.env.BREVO_FROM_EMAIL || 'noreply@itinerary-whisperer.com';
-    this.fromName = process.env.BREVO_FROM_NAME || 'Itinerary Whisperer';
-    this.maxRetries = 3;
-    this.baseDelay = 1000; // 1 second base delay for exponential backoff
-    
-    if (!this.apiKey) {
-      throw new Error('BREVO_API_KEY environment variable is required');
-    }
-    
-    // Initialize Brevo API client
-    this.apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-    const apiKey = this.apiInstance.authentications['api-key'];
-    apiKey.apiKey = this.apiKey;
-    
-    // Track email metrics
-    this.metrics = {
-      sent: 0,
-      failed: 0,
-      retries: 0,
-      totalCost: 0
-    };
+  this.apiKey = process.env.BREVO_API_KEY;
+  this.fromEmail = process.env.BREVO_FROM_EMAIL || 'noreply@itinerary-whisperer.com';
+  this.fromName = process.env.BREVO_FROM_NAME || 'Itinerary Whisperer';
+  this.maxRetries = 3;
+  this.baseDelay = 1000; // 1 second base delay for exponential backoff
+
+  if (!this.apiKey) {
+    throw new Error('BREVO_API_KEY environment variable is required');
+  }
+
+  // Initialize Brevo API client with correct authentication
+  // The @sendinblue/client v3.3.1 uses setApiKey method directly on the API instance
+  this.apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+  this.apiInstance.setApiKey(0, this.apiKey); // 0 is the index for 'api-key' authentication
+
+  // Track email metrics
+  this.metrics = {
+    sent: 0,
+    failed: 0,
+    retries: 0,
+    totalCost: 0
+  };
   }
 
   /**
@@ -255,20 +255,25 @@ class BrevoEmailService {
    * @returns {Promise<boolean>} True if configuration is valid, false otherwise
    */
   async validateConfiguration() {
-    try {
-      // Test API key by getting account info
-      const accountApi = new SibApiV3Sdk.AccountApi();
-      const apiKey = accountApi.authentications['api-key'];
-      apiKey.apiKey = this.apiKey;
-      
-      const account = await accountApi.getAccount();
-      console.log('Brevo email service configured successfully');
-      console.log(`Account: ${account.email}, Plan: ${account.plan[0].type}`);
-      return true;
-    } catch (error) {
-      console.error('Brevo configuration validation failed:', error.message);
-      return false;
+  try {
+    // Create AccountApi instance and set API key
+    const accountApi = new SibApiV3Sdk.AccountApi();
+    accountApi.setApiKey(0, this.apiKey); // 0 is the index for 'api-key' authentication
+    
+    const account = await accountApi.getAccount();
+    console.log('Brevo email service configured successfully');
+    // Safely access account properties - plan might be nested differently
+    if (account && account.email) {
+      console.log(`Account email: ${account.email}`);
+      if (account.plan && Array.isArray(account.plan) && account.plan.length > 0) {
+        console.log(`Plan type: ${account.plan[0].type || 'Unknown'}`);
+      }
     }
+    return true;
+  } catch (error) {
+    console.error('Brevo configuration validation failed:', error.message);
+    return false;
+  }
   }
 }
 
